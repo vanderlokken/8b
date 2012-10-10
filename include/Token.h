@@ -11,6 +11,8 @@ public:
     
     enum Type {
         Null,
+        Whitespace,
+        Comment,
         Identifier,
         Keyword_And,
         Keyword_Boolean,
