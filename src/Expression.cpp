@@ -7,13 +7,6 @@
 
 namespace _8b {
 namespace ast{
-    
-Expression::Expression( size_t typeId )
-    : _typeId ( typeId ) {}
-
-size_t Expression::getTypeId() const {
-    return _typeId;
-}
 
 ExpressionPointer Expression::parse( LexicalAnalyser &lexicalAnalyser, int rightBindingPower ) {
 

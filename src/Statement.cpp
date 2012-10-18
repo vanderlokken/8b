@@ -4,12 +4,7 @@
 
 namespace _8b {
 namespace ast{
-    
-Statement::Statement( size_t typeId ) : _typeId( typeId ) {}
 
-size_t Statement::getTypeId() const {
-    return _typeId;
-}
 
 StatementPointer Statement::parse( LexicalAnalyser &lexicalAnalyser ) {
     
@@ -28,7 +23,6 @@ StatementPointer Statement::parse( LexicalAnalyser &lexicalAnalyser ) {
 
     return std::make_shared<ExpressionStatement>( lexicalAnalyser );
 }
-
 
 
 BlockStatement::BlockStatement( LexicalAnalyser &lexicalAnalyser ) {

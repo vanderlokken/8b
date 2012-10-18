@@ -17,9 +17,11 @@ typedef std::shared_ptr<Statement> StatementPointer;
 class Statement {
 public:
 
-    Statement( size_t typeId );
+    Statement( size_t typeId ) : _typeId( typeId ) {}
 
-    size_t getTypeId() const;
+    template<class T> bool instanceOf() {
+        return _typeId == T::typeId;
+    }
 
     static StatementPointer parse( LexicalAnalyser& );
 

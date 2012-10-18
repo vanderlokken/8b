@@ -16,9 +16,11 @@ typedef std::shared_ptr<Expression> ExpressionPointer;
 class Expression {
 public:
 
-    Expression( size_t typeId );
+    Expression( size_t typeId ) : _typeId ( typeId ) {}
 
-    size_t getTypeId() const;
+    template<class T> bool instanceOf() {
+        return _typeId == T::typeId;
+    }
 
     static ExpressionPointer parse( LexicalAnalyser&, int rightBindingPower = 0 );
 

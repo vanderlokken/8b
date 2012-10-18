@@ -81,10 +81,8 @@ void CodeGenerator::generate( const ast::BlockStatement &blockStatement, llvm::B
 
 void CodeGenerator::generate( ast::StatementPointer statement ) {
 
-    const size_t typeId = statement->getTypeId();
-
 #define _8b_generate_statement( TYPE )                          \
-    if( typeId == TYPE::typeId ) {                              \
+    if( statement->instanceOf<TYPE>() ) {                       \
         generate( *std::static_pointer_cast<TYPE>(statement) ); \
         return;                                                 \
     }
@@ -171,10 +169,8 @@ void CodeGenerator::generate( const ast::WhileStatement &statement ) {
 
 llvm::Value* CodeGenerator::generate( ast::ExpressionPointer expression ) {
 
-    const auto typeId = expression->getTypeId();
-
 #define _8b_generate_expression( TYPE )                                 \
-    if( typeId == TYPE::typeId ) {                                      \
+    if( expression->instanceOf<TYPE>() ) {                              \
         return generate( *std::static_pointer_cast<TYPE>(expression) ); \
     }
 
@@ -259,7 +255,7 @@ llvm::Value* CodeGenerator::generate( const ast::CallExpression &expression ) {
 
     ast::ExpressionPointer callee = expression.getCallee();
 
-    if( callee->getTypeId() != ast::IdentifierExpression::typeId )
+    if( !callee->instanceOf<ast::IdentifierExpression>() )
         throwRuntimeError( "Not implemented" );
 
     llvm::Function *calleeFunction = _llvmFunction->getParent()->getFunction(
@@ -275,10 +271,8 @@ llvm::Value* CodeGenerator::generate( const ast::CallExpression &expression ) {
 
 void CodeGenerator::generateVoid( ast::ExpressionPointer expression ) {
 
-    const auto typeId = expression->getTypeId();
-
 #define _8b_generate_void_expression( TYPE )                         \
-    if( typeId == TYPE::typeId ) {                                   \
+    if( expression->instanceOf<TYPE>() ) {                           \
         generateVoid( *std::static_pointer_cast<TYPE>(expression) ); \
         return;                                                      \
     }
@@ -312,7 +306,7 @@ void CodeGenerator::generateVoid( const ast::DecrementExpression &expression ) {
 
 llvm::Value* CodeGenerator::generateReference( ast::ExpressionPointer expression ) {
 
-    if( expression->getTypeId() == ast::IdentifierExpression::typeId )
+    if( expression->instanceOf<ast::IdentifierExpression>() )
         return generateReference( *std::static_pointer_cast<ast::IdentifierExpression>(expression) );
 
     throwRuntimeError( "Cannot reference expression or not implemented" );
