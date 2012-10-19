@@ -19,7 +19,7 @@ public:
 
     Statement( size_t typeId ) : _typeId( typeId ) {}
 
-    template<class T> bool instanceOf() {
+    template<class T> bool instanceOf() const {
         return _typeId == T::typeId;
     }
 

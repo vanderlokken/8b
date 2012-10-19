@@ -22,20 +22,23 @@ ExpressionPointer Expression::parse( LexicalAnalyser &lexicalAnalyser, int right
 
 ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser ) {
 
-    const Token &token = lexicalAnalyser.getCurrentToken();
+    const Token::Type tokenType = lexicalAnalyser.getCurrentToken().getType();
 
-    if( token.getType() == Token::Identifier )
+    if( tokenType == Token::Identifier )
         return std::make_shared<IdentifierExpression>( lexicalAnalyser );
 
-    if( token.getType() == Token::Constant_Integer )
+    if( tokenType == Token::Constant_Integer )
         return std::make_shared<IntegerConstantExpression>( lexicalAnalyser );
 
-    if( token.getType() == Token::Punctuator_OpeningParenthesis ) {
+    if( tokenType == Token::Punctuator_OpeningParenthesis ) {
         checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_OpeningParenthesis );
         ExpressionPointer expression = Expression::parse( lexicalAnalyser );
         checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_ClosingParenthesis );
         return expression;
     }
+
+    if( tokenType == Token::Keyword_True || tokenType == Token::Keyword_False )
+        return std::make_shared<BooleanConstantExpression>( lexicalAnalyser );
 
     throwRuntimeError( "Unexpected token" );
 }
@@ -97,6 +100,22 @@ IntegerConstantExpression::IntegerConstantExpression( LexicalAnalyser &lexicalAn
 }
 
 int IntegerConstantExpression::getValue() const {
+    return _value;
+}
+
+BooleanConstantExpression::BooleanConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
+
+    if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_True )
+        _value = true;
+    else if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_False )
+        _value = false;
+    else
+        throwRuntimeError( "Unexpected token" );
+
+    lexicalAnalyser.extractToken();
+}
+
+bool BooleanConstantExpression::getValue() const {
     return _value;
 }
 

@@ -26,7 +26,7 @@ public:
 
     Value( size_t typeId ) : _typeId( typeId ), _llvmValue( 0 ) {}
 
-    template<class T> bool instanceOf() {
+    template<class T> bool instanceOf() const {
         return _typeId == T::typeId;
     }
 
@@ -72,7 +72,7 @@ class IntegerValue : public ValueType<IntegerValue> {
 public:
 
     static IntegerValuePointer create( const std::string &name, int bitWidth = 32 );
-    static IntegerValuePointer create( int value = 0 );
+    static IntegerValuePointer create( int value );
     static IntegerValuePointer create( llvm::Value *value );
 
     ValuePointer generateAdd( ValuePointer ) const;
@@ -102,6 +102,7 @@ class BooleanValue : public ValueType<BooleanValue> {
 public:
 
     static BooleanValuePointer create( const std::string &name );
+    static BooleanValuePointer create( bool );
     static BooleanValuePointer create( llvm::Value *value );
 
     void generateAssignment( ValuePointer ) const;
@@ -109,6 +110,7 @@ public:
     IntegerValuePointer generateToInteger() const;
 
     BooleanValue( const std::string &name );
+    BooleanValue( bool );
     BooleanValue( llvm::Value *value ) { _llvmValue = value; }
 };
 

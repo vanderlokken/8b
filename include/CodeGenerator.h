@@ -29,6 +29,7 @@ private:
     ValuePointer generate( ast::ExpressionPointer );
     ValuePointer generate( const ast::IdentifierExpression& );
     ValuePointer generate( const ast::IntegerConstantExpression& );
+    ValuePointer generate( const ast::BooleanConstantExpression& );
     ValuePointer generate( const ast::AdditionExpression& );
     ValuePointer generate( const ast::SubtractionExpression& );
     ValuePointer generate( const ast::MultiplicationExpression& );

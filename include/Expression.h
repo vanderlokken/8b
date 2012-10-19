@@ -18,7 +18,7 @@ public:
 
     Expression( size_t typeId ) : _typeId ( typeId ) {}
 
-    template<class T> bool instanceOf() {
+    template<class T> bool instanceOf() const {
         return _typeId == T::typeId;
     }
 
@@ -62,6 +62,17 @@ public:
 
 private:
     int _value;
+};
+
+
+class BooleanConstantExpression : public ExpressionType<BooleanConstantExpression> {
+public:
+    BooleanConstantExpression( LexicalAnalyser& );
+
+    bool getValue() const;
+
+private:
+    bool _value;
 };
 
 

@@ -183,6 +183,7 @@ ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
 
     _8b_generate_expression( ast::IdentifierExpression );
     _8b_generate_expression( ast::IntegerConstantExpression );
+    _8b_generate_expression( ast::BooleanConstantExpression );
     _8b_generate_expression( ast::AdditionExpression );
     _8b_generate_expression( ast::SubtractionExpression );
     _8b_generate_expression( ast::MultiplicationExpression );
@@ -202,6 +203,10 @@ ValuePointer CodeGenerator::generate( const ast::IdentifierExpression &expressio
 
 ValuePointer CodeGenerator::generate( const ast::IntegerConstantExpression &expression ) {
     return IntegerValue::create( expression.getValue() );
+}
+
+ValuePointer CodeGenerator::generate( const ast::BooleanConstantExpression &expression ) {
+    return BooleanValue::create( expression.getValue() );
 }
 
 ValuePointer CodeGenerator::generate( const ast::AdditionExpression &expression ) {

@@ -42,19 +42,19 @@ ValuePointer Value::generateDivide( ValuePointer ) const {
 }
 
 BooleanValuePointer Value::generateAnd( ValuePointer operand ) const {
-    return BooleanValue::create(
-        irBuilder.CreateAnd(
-            generateToBoolean()->getLlvmValue(), operand->generateToBoolean()->getLlvmValue()
-        )
-    );
+    llvm::Value *left =
+        instanceOf<BooleanValue>() ? getLlvmValue() : generateToBoolean()->getLlvmValue();
+    llvm::Value *right =
+        operand->instanceOf<BooleanValue>() ? operand->getLlvmValue() : operand->generateToBoolean()->getLlvmValue();
+    return BooleanValue::create( irBuilder.CreateAnd(left, right) );
 }
 
 BooleanValuePointer Value::generateOr( ValuePointer operand ) const {
-    return BooleanValue::create(
-        irBuilder.CreateOr(
-            generateToBoolean()->getLlvmValue(), operand->generateToBoolean()->getLlvmValue()
-        )
-    );
+    llvm::Value *left =
+        instanceOf<BooleanValue>() ? getLlvmValue() : generateToBoolean()->getLlvmValue();
+    llvm::Value *right =
+        operand->instanceOf<BooleanValue>() ? operand->getLlvmValue() : operand->generateToBoolean()->getLlvmValue();
+    return BooleanValue::create( irBuilder.CreateOr(left, right) );
 }
 
 BooleanValuePointer Value::generateLess( ValuePointer ) const {
@@ -173,6 +173,10 @@ BooleanValuePointer BooleanValue::create( const std::string &name ) {
     return std::make_shared<BooleanValue>( name );
 }
 
+BooleanValuePointer BooleanValue::create( bool value ) {
+    return std::make_shared<BooleanValue>( value );
+}
+
 BooleanValuePointer BooleanValue::create( llvm::Value *value ) {
     return std::make_shared<BooleanValue>( value );
 }
@@ -181,6 +185,14 @@ BooleanValue::BooleanValue( const std::string &name ) {
     llvm::Type *type = llvm::Type::getInt1Ty( globalLLVMContext );
     _llvmValue = irBuilder.CreateAlloca( type );
     _llvmValue->setName( name );
+}
+
+BooleanValue::BooleanValue( bool value ) {
+    llvm::Type *type = llvm::Type::getInt1Ty( globalLLVMContext );
+    if( value )
+        _llvmValue = llvm::ConstantInt::getTrue( type );
+    else
+        _llvmValue = llvm::ConstantInt::getFalse( type );
 }
 
 void BooleanValue::generateAssignment( ValuePointer operand ) const {
