@@ -92,6 +92,9 @@ public:
     IntegerValue( const std::string &name, int bitWidth );
     IntegerValue( int value );
     IntegerValue( llvm::Value *value ) { _llvmValue = value; }
+
+private:
+    static llvm::Value* integerOperand( ValuePointer );
 };
 
 
@@ -102,6 +105,8 @@ public:
     static BooleanValuePointer create( llvm::Value *value );
 
     void generateAssignment( ValuePointer ) const;
+
+    IntegerValuePointer generateToInteger() const;
 
     BooleanValue( const std::string &name );
     BooleanValue( llvm::Value *value ) { _llvmValue = value; }

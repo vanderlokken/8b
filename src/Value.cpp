@@ -117,47 +117,33 @@ IntegerValue::IntegerValue( int value ) {
 }
 
 ValuePointer IntegerValue::generateAdd( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    return IntegerValue::create( irBuilder.CreateAdd(getLlvmValue(), operand->getLlvmValue()) );
+    return IntegerValue::create( irBuilder.CreateAdd(getLlvmValue(), integerOperand(operand)) );
 }
 
 ValuePointer IntegerValue::generateSubtract( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    return IntegerValue::create( irBuilder.CreateSub(getLlvmValue(), operand->getLlvmValue()) );
+    return IntegerValue::create( irBuilder.CreateSub(getLlvmValue(), integerOperand(operand)) );
 }
 
 ValuePointer IntegerValue::generateMultiply( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    return IntegerValue::create( irBuilder.CreateMul(getLlvmValue(), operand->getLlvmValue()) );
+    return IntegerValue::create( irBuilder.CreateMul(getLlvmValue(), integerOperand(operand)) );
 }
 
 ValuePointer IntegerValue::generateDivide( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    return IntegerValue::create( irBuilder.CreateSDiv(getLlvmValue(), operand->getLlvmValue()) );
+    return IntegerValue::create( irBuilder.CreateSDiv(getLlvmValue(), integerOperand(operand)) );
 }
 
 BooleanValuePointer IntegerValue::generateLess( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    return BooleanValue::create( irBuilder.CreateICmpSLT(getLlvmValue(), operand->getLlvmValue()) );
+    return BooleanValue::create( irBuilder.CreateICmpSLT(getLlvmValue(), integerOperand(operand)) );
 }
 
 BooleanValuePointer IntegerValue::generateGreater( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    return BooleanValue::create( irBuilder.CreateICmpSGT(getLlvmValue(), operand->getLlvmValue()) );
+    return BooleanValue::create( irBuilder.CreateICmpSGT(getLlvmValue(), integerOperand(operand)) );
 }
 
 void IntegerValue::generateAssignment( ValuePointer operand ) const {
-    if( !operand->instanceOf<IntegerValue>() )
-        throwRuntimeError( "Not implemented or not supported" );
     if( !llvm::AllocaInst::classof(_llvmValue) )
         throwRuntimeError( "An assignment to a temporary value is not possible" );
-    irBuilder.CreateStore( operand->getLlvmValue(), _llvmValue );
+    irBuilder.CreateStore( integerOperand(operand), _llvmValue );
 }
 
 void IntegerValue::generateIncrement() const {
@@ -170,6 +156,14 @@ void IntegerValue::generateDecrement() const {
 
 BooleanValuePointer IntegerValue::generateToBoolean() const {
     return BooleanValue::create( irBuilder.CreateIsNotNull(getLlvmValue()) );
+}
+
+llvm::Value* IntegerValue::integerOperand( ValuePointer operand ) {
+    if( operand->instanceOf<BooleanValue>() )
+        operand = operand->generateToInteger();
+    if( !operand->instanceOf<IntegerValue>() )
+        throwRuntimeError( "Not implemented or not supported" );
+    return operand->getLlvmValue();
 }
 
 
@@ -193,6 +187,12 @@ void BooleanValue::generateAssignment( ValuePointer operand ) const {
     if( !llvm::AllocaInst::classof(_llvmValue) )
         throwRuntimeError( "An assignment to a temporary value is not possible" );
     irBuilder.CreateStore( operand->generateToBoolean()->getLlvmValue(), _llvmValue );
+}
+
+IntegerValuePointer BooleanValue::generateToInteger() const {
+    llvm::Value *converted = irBuilder.CreateZExt(
+        getLlvmValue(), llvm::Type::getInt32Ty(globalLLVMContext) );
+    return IntegerValue::create( converted );
 }
 
 
