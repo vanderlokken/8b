@@ -1,16 +1,15 @@
 #pragma once
 
-#include <map>
-
 #include <llvm/BasicBlock.h>
 #include <llvm/Function.h>
 #include <llvm/Module.h>
 #include <llvm/Value.h>
 
 #include "Module.h"
+#include "SymbolTable.h"
 
 namespace _8b {
-    
+
 class CodeGenerator {
 public:
     std::shared_ptr<llvm::Module> generate( const ast::Module &module );
@@ -27,33 +26,28 @@ private:
     void generate( const ast::VariableDeclarationStatement& );
     void generate( const ast::WhileStatement& );
 
-    llvm::Value* generate( ast::ExpressionPointer );
-    llvm::Value* generate( const ast::IdentifierExpression& );
-    llvm::Value* generate( const ast::IntegerConstantExpression& );
-    llvm::Value* generate( const ast::AdditionExpression& );
-    llvm::Value* generate( const ast::SubtractionExpression& );
-    llvm::Value* generate( const ast::MultiplicationExpression& );
-    llvm::Value* generate( const ast::DivisionExpression& );
-    llvm::Value* generate( const ast::LogicAndExpression& );
-    llvm::Value* generate( const ast::LogicOrExpression& );
-    llvm::Value* generate( const ast::LessExpression& );
-    llvm::Value* generate( const ast::GreaterExpression& );
-    llvm::Value* generate( const ast::CallExpression& );
+    ValuePointer generate( ast::ExpressionPointer );
+    ValuePointer generate( const ast::IdentifierExpression& );
+    ValuePointer generate( const ast::IntegerConstantExpression& );
+    ValuePointer generate( const ast::AdditionExpression& );
+    ValuePointer generate( const ast::SubtractionExpression& );
+    ValuePointer generate( const ast::MultiplicationExpression& );
+    ValuePointer generate( const ast::DivisionExpression& );
+    ValuePointer generate( const ast::LogicAndExpression& );
+    ValuePointer generate( const ast::LogicOrExpression& );
+    ValuePointer generate( const ast::LessExpression& );
+    ValuePointer generate( const ast::GreaterExpression& );
+    ValuePointer generate( const ast::CallExpression& );
 
     void generateVoid( ast::ExpressionPointer );
     void generateVoid( const ast::AssignmentExpression& );
     void generateVoid( const ast::IncrementExpression& );
     void generateVoid( const ast::DecrementExpression& );
 
-    llvm::Value* generateReference( ast::ExpressionPointer );
-    llvm::Value* generateReference( const ast::IdentifierExpression& );
-
-    llvm::Value* toBoolean( llvm::Value* );
-
     llvm::BasicBlock* insertBasicBlock( const std::string& );
 
     llvm::Function *_llvmFunction;
-    std::map<std::string, llvm::Value*> _symbolTable;
+    SymbolTable _symbolTable;
 };
 
 }
