@@ -36,7 +36,8 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
 
     // Read return type
 
-    _returnType = std::make_shared<Type>( lexicalAnalyser );
+    if( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_OpeningBrace )
+        _returnType = std::make_shared<Type>( lexicalAnalyser );
 
     // Read statement block
 
@@ -51,6 +52,10 @@ const std::string& Function::getIdentifier() const noexcept {
 
 const std::vector<Function::Argument>& Function::getArguments() const noexcept {
     return _arguments;
+}
+
+TypePointer Function::getReturnType() const {
+    return _returnType;
 }
 
 const BlockStatement& Function::getBlockStatement() const {

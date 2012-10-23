@@ -21,12 +21,13 @@ public:
     
     const std::string& getIdentifier() const noexcept;
     const std::vector<Argument>& getArguments() const noexcept;
+    TypePointer getReturnType() const noexcept;
     const BlockStatement& getBlockStatement() const;
     
 private:
     std::string _identifier;
     std::vector<Argument> _arguments;
-    std::shared_ptr<Type> _returnType;
+    TypePointer _returnType;
     BlockStatement _blockStatement;
 };
 
