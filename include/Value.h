@@ -5,6 +5,8 @@
 
 #include <llvm/Value.h>
 
+#include "ClassId.h"
+
 namespace _8b {
 
 
@@ -21,14 +23,12 @@ class FunctionValue;
 typedef std::shared_ptr<FunctionValue> FunctionValuePointer;
 
 
-class Value {
+class Value : public BaseIdClass {
 public:
 
-    Value( size_t typeId ) : _typeId( typeId ), _llvmValue( 0 ) {}
+    Value() : _llvmValue( 0 ) {}
 
-    template<class T> bool instanceOf() const {
-        return _typeId == T::typeId;
-    }
+    virtual ~Value() {}
 
     llvm::Value* getLlvmValue() const;
 
@@ -52,20 +52,11 @@ public:
     virtual ValuePointer generateCall( const std::vector<ValuePointer>& ) const;
     
 protected:
-    size_t _typeId;
     llvm::Value *_llvmValue;
 };
 
-
-template< class T >
-class ValueType : public Value {
-public:
-    ValueType() : Value( typeId ) {}
-    static const size_t typeId;
-};
-
-template< class T >
-const size_t ValueType<T>::typeId = (size_t)( typeid(T).raw_name() );
+template<class T>
+class ValueType : public DerivedIdClass<Value, T> {};
 
 
 class IntegerValue : public ValueType<IntegerValue> {

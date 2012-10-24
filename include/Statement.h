@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "ClassId.h"
 #include "Expression.h"
 #include "LexicalAnalyser.h"
 #include "Type.h"
@@ -14,31 +15,13 @@ class Statement;
 typedef std::shared_ptr<Statement> StatementPointer;
 
 
-class Statement {
+class Statement : public BaseIdClass {
 public:
-
-    Statement( size_t typeId ) : _typeId( typeId ) {}
-
-    template<class T> bool instanceOf() const {
-        return _typeId == T::typeId;
-    }
-
     static StatementPointer parse( LexicalAnalyser& );
-
-protected:
-    size_t _typeId;
 };
 
-
-template< class T >
-class StatementType : public Statement {
-public:
-    StatementType() : Statement( typeId ) {}
-    static const size_t typeId;
-};
-
-template< class T >
-const size_t StatementType<T>::typeId = (size_t)( typeid(T).raw_name() );
+template<class T>
+class StatementType : public DerivedIdClass<Statement, T> {};
 
 
 class BlockStatement : public StatementType<BlockStatement> {
@@ -95,11 +78,12 @@ public:
     VariableDeclarationStatement( LexicalAnalyser& );
 
     const std::string& getIdentifier() const;
+    TypePointer getType() const;
     ExpressionPointer getInitializerExpression() const;
 
 private:
     std::string _identifier;
-    std::shared_ptr<Type> _type;
+    TypePointer _type;
     ExpressionPointer _initializerExpression;
 };
 

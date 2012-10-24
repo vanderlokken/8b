@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "CheckToken.h"
+#include "ClassId.h"
 #include "LexicalAnalyser.h"
 
 namespace _8b {
@@ -13,34 +14,17 @@ class Expression;
 typedef std::shared_ptr<Expression> ExpressionPointer;
 
 
-class Expression {
+class Expression : public BaseIdClass {
 public:
-
-    Expression( size_t typeId ) : _typeId ( typeId ) {}
-
-    template<class T> bool instanceOf() const {
-        return _typeId == T::typeId;
-    }
-
     static ExpressionPointer parse( LexicalAnalyser&, int rightBindingPower = 0 );
 
 protected:
     static ExpressionPointer nullDenotation( LexicalAnalyser& );
     static ExpressionPointer leftDenotation( LexicalAnalyser&, ExpressionPointer );
-
-    size_t _typeId;
 };
 
-
-template< class T >
-class ExpressionType : public Expression {
-public:
-    ExpressionType() : Expression( typeId ) {}
-    static const size_t typeId;
-};
-
-template< class T >
-const size_t ExpressionType<T>::typeId = (size_t)( typeid(T).raw_name() );
+template<class T>
+class ExpressionType : public DerivedIdClass<Expression, T> {};
 
 
 class IdentifierExpression : public ExpressionType<IdentifierExpression> {
