@@ -28,7 +28,7 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
         Token token = lexicalAnalyser.extractToken();
         checkToken( token, Token::Identifier );
 
-        Argument argument = { token.getLexem(), Type(lexicalAnalyser) };
+        Argument argument = { token.getLexem(), Type::parse(lexicalAnalyser) };
         _arguments.push_back( argument );
     }
 
@@ -37,7 +37,7 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
     // Read return type
 
     if( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_OpeningBrace )
-        _returnType = std::make_shared<Type>( lexicalAnalyser );
+        _returnType = Type::parse( lexicalAnalyser );
 
     // Read statement block
 

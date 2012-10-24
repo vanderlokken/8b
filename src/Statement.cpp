@@ -106,7 +106,7 @@ VariableDeclarationStatement::VariableDeclarationStatement( LexicalAnalyser &lex
         checkToken( lexicalAnalyser.extractToken(), Token::Operator_Assign );
         _initializerExpression = Expression::parse( lexicalAnalyser );
     } else {
-        _type = std::make_shared<Type>( lexicalAnalyser );
+        _type = Type::parse( lexicalAnalyser );
     }
 
     checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_Semicolon );
@@ -114,6 +114,10 @@ VariableDeclarationStatement::VariableDeclarationStatement( LexicalAnalyser &lex
 
 const std::string& VariableDeclarationStatement::getIdentifier() const {
     return _identifier;
+}
+
+TypePointer VariableDeclarationStatement::getType() const {
+    return _type;
 }
 
 ExpressionPointer VariableDeclarationStatement::getInitializerExpression() const {

@@ -144,14 +144,39 @@ void CodeGenerator::generate( const ast::ReturnStatement &statement ) {
 
 void CodeGenerator::generate( const ast::VariableDeclarationStatement &statement ) {
 
-    ValuePointer variable = IntegerValue::create( statement.getIdentifier() );
+    ValuePointer variable;
 
-    _symbolTable.addSymbol( statement.getIdentifier(), variable );
-
+    ast::TypePointer type = statement.getType();
     ast::ExpressionPointer initializerExpression = statement.getInitializerExpression();
 
-    if( initializerExpression )
-        variable->generateAssignment( generate(initializerExpression) );
+    if( type ) {
+
+        if( type->instanceOf<ast::IntegerType>() )
+            variable = IntegerValue::create( statement.getIdentifier() );
+        else if( type->instanceOf<ast::BooleanType>() )
+            variable = BooleanValue::create( statement.getIdentifier() );
+        else
+            throwRuntimeError( "Not supported or invalid type identifier" );
+    
+    } else if( initializerExpression ) {
+
+        ValuePointer initializerValue = generate( initializerExpression );
+
+        if( initializerValue->instanceOf<IntegerValue>() )
+            variable = IntegerValue::create( statement.getIdentifier() );
+        else if( initializerValue->instanceOf<BooleanValue>() )
+            variable = BooleanValue::create( statement.getIdentifier() );
+        else if( initializerValue->instanceOf<FunctionValue>() )
+            throwRuntimeError( "Not implemented" );
+
+        variable->generateAssignment( initializerValue );
+
+    } else {
+        throwRuntimeError( "A variable declaration statement doesn't contain"
+            " neither type identifier nor initializer expression" );
+    }
+
+    _symbolTable.addSymbol( statement.getIdentifier(), variable );
 
     return;
 }

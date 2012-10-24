@@ -14,7 +14,7 @@ public:
 
     struct Argument {
         std::string identifier;
-        Type type;
+        TypePointer type;
     };
     
     Function( LexicalAnalyser& );
