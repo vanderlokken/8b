@@ -15,26 +15,13 @@ extern llvm::IRBuilder<> irBuilder;
 // Value
 
 ValuePointer Value::createVariable( ValueTypePointer type, const std::string &identifier ) {
-    Value *variable = new Value();
-    variable->_type = type;
-    variable->_llvmValue = irBuilder.CreateAlloca( type->toLlvm() );
-    variable->_llvmValue->setName( identifier );
-    return ValuePointer( variable );
-}
-
-ValuePointer Value::createArgument( ValueTypePointer type, const std::string &identifier ) {
-    Value *argument = new Value();
-    argument->_type = type;
-    argument->_llvmValue = new llvm::Argument( type->toLlvm() );
-    argument->_llvmValue->setName( identifier );
-    return ValuePointer( argument );
+    llvm::Value *llvmValue = irBuilder.CreateAlloca( type->toLlvm() );
+    llvmValue->setName( identifier );
+    return std::make_shared<Value>( type, llvmValue );
 }
 
 ValuePointer Value::createSsaValue( ValueTypePointer type, llvm::Value *value ) {
-    Value *ssaValue = new Value();
-    ssaValue->_type = type;
-    ssaValue->_llvmValue = value;
-    return ValuePointer( ssaValue );
+    return std::make_shared<Value>( type, value );
 }
 
 ValuePointer Value::createUnusableValue() {
@@ -100,6 +87,11 @@ llvm::Type* ValueType::toLlvm() const {
 }
 
 ValuePointer ValueType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
+
+    if( operation == BinaryOperation::LogicOr ||
+        operation == BinaryOperation::LogicAnd )
+        return first->toBoolean()->generateBinaryOperation( operation, second->toBoolean() );
+
     throwRuntimeError( "This type doesn't implement specified operation" );
     return 0;
 }
@@ -144,37 +136,27 @@ ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, Va
 
     if( operation == BinaryOperation::Addition )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateAdd(integerOperand(first), integerOperand(second)) );
+            irBuilder.CreateAdd(first->getLlvmValue(), integerOperand(second)) );
 
     if( operation == BinaryOperation::Subtraction )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateSub(integerOperand(first), integerOperand(second)) );
+            irBuilder.CreateSub(first->getLlvmValue(), integerOperand(second)) );
 
     if( operation == BinaryOperation::Multiplication )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateMul(integerOperand(first), integerOperand(second)) );
+            irBuilder.CreateMul(first->getLlvmValue(), integerOperand(second)) );
 
     if( operation == BinaryOperation::Division )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateSDiv(integerOperand(first), integerOperand(second)) );
-
-    if( operation == BinaryOperation::LogicOr )
-        return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateOr(
-                first->toBoolean()->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
-
-    if( operation == BinaryOperation::LogicAnd )
-        return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateAnd(
-                first->toBoolean()->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
+            irBuilder.CreateSDiv(first->getLlvmValue(), integerOperand(second)) );
 
     if( operation == BinaryOperation::LessComparison )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateICmpSLT(integerOperand(first), integerOperand(second)) );
+            irBuilder.CreateICmpSLT(first->getLlvmValue(), integerOperand(second)) );
 
     if( operation == BinaryOperation::GreaterComparison )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateICmpSGT(integerOperand(first), integerOperand(second)) );
+            irBuilder.CreateICmpSGT(first->getLlvmValue(), integerOperand(second)) );
     
     return ValueType::generateBinaryOperation( operation, first, second );
 }
@@ -233,7 +215,35 @@ BooleanType::BooleanType() {
 }
 
 ValuePointer BooleanType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
-    
+
+    if( operation == BinaryOperation::Assignment ) {
+
+        if( !llvm::AllocaInst::classof(first->getRawLlvmValue()) )
+            throwRuntimeError( "An assignment to a temporary value is not possible" );
+
+        irBuilder.CreateStore( second->toBoolean()->getLlvmValue(), first->getRawLlvmValue() );
+
+        return Value::createUnusableValue();
+    }
+
+    if( operation == BinaryOperation::LogicOr )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateOr(first->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
+
+    if( operation == BinaryOperation::LogicAnd )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateAnd(first->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
+
+    if( operation == BinaryOperation::Addition ||
+        operation == BinaryOperation::Subtraction ||
+        operation == BinaryOperation::Multiplication ||
+        operation == BinaryOperation::Division ||
+        operation == BinaryOperation::LessComparison ||
+        operation == BinaryOperation::GreaterComparison )
+    {
+        return first->toInteger()->generateBinaryOperation( operation, second );
+    }
+
     return ValueType::generateBinaryOperation( operation, first, second );
 }
 

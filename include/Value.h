@@ -22,13 +22,12 @@ class Value : public std::enable_shared_from_this<Value> {
 public:
 
     static ValuePointer createVariable( ValueTypePointer type, const std::string &identifier );
-    static ValuePointer createArgument( ValueTypePointer type, const std::string &identifier );
     static ValuePointer createSsaValue( ValueTypePointer type, llvm::Value* );
     static ValuePointer createUnusableValue();
     static ValuePointer createIntegerConstant( int );
     static ValuePointer createBooleanConstant( bool );
 
-    Value() : _llvmValue( 0 ) {}
+    Value( ValueTypePointer type, llvm::Value *llvmValue ) : _type( type ), _llvmValue( llvmValue ) {}
 
     ValueTypePointer getType() const;
     llvm::Value* getLlvmValue() const;
