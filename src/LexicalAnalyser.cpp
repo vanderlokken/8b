@@ -45,6 +45,7 @@ Token LexicalAnalyser::readToken() {
         { std::regex("\\s+"), Token::Whitespace, false },
         { std::regex("and(?![_0-9a-zA-Z])"), Token::Keyword_And, false },
         { std::regex("boolean(?![_0-9a-zA-Z])"), Token::Keyword_Boolean, false },
+        { std::regex("class(?![_0-9a-zA-Z])"), Token::Keyword_Class, false },
         { std::regex("constant(?![_0-9a-zA-Z])"), Token::Keyword_Constant, false },
         { std::regex("if(?![_0-9a-zA-Z])"), Token::Keyword_If, false },
         { std::regex("in(?![_0-9a-zA-Z])"), Token::Keyword_In, false },

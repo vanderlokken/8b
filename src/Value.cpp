@@ -161,14 +161,12 @@ ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, Va
     if( operation == BinaryOperation::LogicOr )
         return Value::createSsaValue( BooleanType::get(),
             irBuilder.CreateOr(
-                first->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue(),
-                second->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue()) );
+                first->toBoolean()->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
 
     if( operation == BinaryOperation::LogicAnd )
         return Value::createSsaValue( BooleanType::get(),
             irBuilder.CreateAnd(
-                first->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue(),
-                second->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue()) );
+                first->toBoolean()->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
 
     if( operation == BinaryOperation::LessComparison )
         return Value::createSsaValue( BooleanType::get(),

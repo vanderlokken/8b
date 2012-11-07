@@ -16,6 +16,7 @@ public:
         Identifier,
         Keyword_And,
         Keyword_Boolean,
+        Keyword_Class,
         Keyword_Constant,
         Keyword_If,
         Keyword_In,
