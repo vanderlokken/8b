@@ -16,8 +16,6 @@ namespace _8b {
 extern llvm::LLVMContext &globalLLVMContext = llvm::getGlobalContext();
 extern llvm::IRBuilder<> irBuilder( globalLLVMContext );
 
-llvm::Type *int32 = llvm::IntegerType::get( globalLLVMContext, 32 );
-
 
 std::shared_ptr<llvm::Module> CodeGenerator::generate( const ast::Module &module ) {
 
@@ -39,27 +37,42 @@ void CodeGenerator::generate( const ast::Function &function, llvm::Module *modul
 
     const std::vector<ast::Function::Argument> &arguments = function.getArguments();
 
-    const std::vector<llvm::Type*> argumentTypes( arguments.size(), int32 );
-    llvm::Type *returnType = int32;
+    std::vector<ValueTypePointer> argumentTypes( arguments.size() );
+    
+    std::transform(
+        arguments.cbegin(),
+        arguments.cend(),
+        argumentTypes.begin(),
+        []( const ast::Function::Argument &argument ) -> ValueTypePointer {
+            return CodeGenerator::valueTypeByAstType( argument.type );
+        });
 
-    const bool isVariableArgument = false;
+    ValueTypePointer functionType;
 
-    llvm::FunctionType *type = llvm::FunctionType::get(
-        returnType, argumentTypes, isVariableArgument);
+    if( function.getReturnType() )
+        functionType = std::make_shared<FunctionType>(
+            argumentTypes, CodeGenerator::valueTypeByAstType(function.getReturnType()) );
+    else
+        functionType = std::make_shared<FunctionType>( argumentTypes );
 
     _llvmFunction = llvm::Function::Create(
-        type, llvm::Function::ExternalLinkage, function.getIdentifier(), module );
+        static_cast<llvm::FunctionType*>(functionType->toLlvm()), llvm::Function::ExternalLinkage, function.getIdentifier(), module );
 
-    _symbolTable.addSymbol( function.getIdentifier(), FunctionValue::create(_llvmFunction) );
+    ValuePointer functionValue = Value::createSsaValue( functionType, _llvmFunction );
+
+    _symbolTable.addSymbol( function.getIdentifier(), functionValue );
 
     _symbolTable.pushLexicalScope();
 
     for( llvm::Function::arg_iterator it = _llvmFunction->arg_begin(); it != _llvmFunction->arg_end(); ++it ) {
+        
         size_t index = std::distance( _llvmFunction->arg_begin(), it );
 
         llvm::Value *value = it;
         value->setName( arguments[index].identifier );
-        _symbolTable.addSymbol( arguments[index].identifier, IntegerValue::create(value) );
+
+        _symbolTable.addSymbol( arguments[index].identifier,
+            Value::createSsaValue(argumentTypes[index], value) );
     }
 
     generate( function.getBlockStatement() );
@@ -105,7 +118,7 @@ void CodeGenerator::generate( ast::StatementPointer statement ) {
 }
 
 void CodeGenerator::generate( const ast::ExpressionStatement &statement ) {
-    generateVoid( statement.getExpression() );
+    generate( statement.getExpression() );
 }
 
 void CodeGenerator::generate( const ast::IfStatement &statement ) {
@@ -116,7 +129,7 @@ void CodeGenerator::generate( const ast::IfStatement &statement ) {
     llvm::BasicBlock *falseBlock = hasFalseBlock ? insertBasicBlock( "ifFalse" ) : 0;
     llvm::BasicBlock *nextCodeBlock = insertBasicBlock( "endif" );
 
-    llvm::Value *condition = generate( statement.getConditionExpression() )->generateToBoolean()->getLlvmValue();
+    llvm::Value *condition = generate( statement.getConditionExpression() )->toBoolean()->getLlvmValue();
 
     irBuilder.CreateCondBr(
         condition, trueBlock, hasFalseBlock ? falseBlock : nextCodeBlock );
@@ -149,34 +162,24 @@ void CodeGenerator::generate( const ast::VariableDeclarationStatement &statement
     ast::TypePointer type = statement.getType();
     ast::ExpressionPointer initializerExpression = statement.getInitializerExpression();
 
+    const std::string &identifier = statement.getIdentifier();
+
     if( type ) {
 
-        if( type->instanceOf<ast::IntegerType>() )
-            variable = IntegerValue::create( statement.getIdentifier() );
-        else if( type->instanceOf<ast::BooleanType>() )
-            variable = BooleanValue::create( statement.getIdentifier() );
-        else
-            throwRuntimeError( "Not supported or invalid type identifier" );
+        variable = Value::createVariable( valueTypeByAstType(type), identifier );
     
     } else if( initializerExpression ) {
 
         ValuePointer initializerValue = generate( initializerExpression );
-
-        if( initializerValue->instanceOf<IntegerValue>() )
-            variable = IntegerValue::create( statement.getIdentifier() );
-        else if( initializerValue->instanceOf<BooleanValue>() )
-            variable = BooleanValue::create( statement.getIdentifier() );
-        else if( initializerValue->instanceOf<FunctionValue>() )
-            throwRuntimeError( "Not implemented" );
-
-        variable->generateAssignment( initializerValue );
+        variable = Value::createVariable( initializerValue->getType(), identifier );
+        variable->generateBinaryOperation( BinaryOperation::Assignment, initializerValue );
 
     } else {
         throwRuntimeError( "A variable declaration statement doesn't contain"
             " neither type identifier nor initializer expression" );
     }
 
-    _symbolTable.addSymbol( statement.getIdentifier(), variable );
+    _symbolTable.addSymbol( identifier, variable );
 
     return;
 }
@@ -193,7 +196,7 @@ void CodeGenerator::generate( const ast::WhileStatement &statement ) {
     irBuilder.CreateBr( loopStart );
 
     irBuilder.SetInsertPoint( loopStart );
-    llvm::Value *condition = generate( statement.getConditionExpression() )->generateToBoolean()->getLlvmValue();
+    llvm::Value *condition = generate( statement.getConditionExpression() )->toBoolean()->getLlvmValue();
     irBuilder.CreateCondBr( condition, loopCode, loopEnd );
 
     irBuilder.SetInsertPoint( loopEnd );
@@ -209,17 +212,11 @@ ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
     _8b_generate_expression( ast::IdentifierExpression );
     _8b_generate_expression( ast::IntegerConstantExpression );
     _8b_generate_expression( ast::BooleanConstantExpression );
-    _8b_generate_expression( ast::AdditionExpression );
-    _8b_generate_expression( ast::SubtractionExpression );
-    _8b_generate_expression( ast::MultiplicationExpression );
-    _8b_generate_expression( ast::DivisionExpression );
-    _8b_generate_expression( ast::LogicAndExpression );
-    _8b_generate_expression( ast::LogicOrExpression );
-    _8b_generate_expression( ast::LessExpression );
-    _8b_generate_expression( ast::GreaterExpression );
+    _8b_generate_expression( ast::UnaryOperationExpression );
+    _8b_generate_expression( ast::BinaryOperationExpression );
     _8b_generate_expression( ast::CallExpression );
 
-    throwRuntimeError( "An expression has no return value or not implemented" );
+    throwRuntimeError( "Not implemented" );
 }
 
 ValuePointer CodeGenerator::generate( const ast::IdentifierExpression &expression ) {
@@ -227,107 +224,50 @@ ValuePointer CodeGenerator::generate( const ast::IdentifierExpression &expressio
 }
 
 ValuePointer CodeGenerator::generate( const ast::IntegerConstantExpression &expression ) {
-    return IntegerValue::create( expression.getValue() );
+    return Value::createIntegerConstant( expression.getValue() );
 }
 
 ValuePointer CodeGenerator::generate( const ast::BooleanConstantExpression &expression ) {
-    return BooleanValue::create( expression.getValue() );
+    return Value::createBooleanConstant( expression.getValue() );
 }
 
-ValuePointer CodeGenerator::generate( const ast::AdditionExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateAdd( rightValue );
+ValuePointer CodeGenerator::generate( const ast::UnaryOperationExpression &expression ) {
+    ValuePointer operand = generate( expression.getOperand() );
+    return operand->generateUnaryOperation( expression.getOperation() );
 }
 
-ValuePointer CodeGenerator::generate( const ast::SubtractionExpression &expression ) {
+ValuePointer CodeGenerator::generate( const ast::BinaryOperationExpression &expression ) {
     ValuePointer leftValue = generate( expression.getLeftOperand() );
     ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateSubtract( rightValue );
-}
-
-ValuePointer CodeGenerator::generate( const ast::MultiplicationExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateMultiply( rightValue );
-}
-
-ValuePointer CodeGenerator::generate( const ast::DivisionExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateDivide( rightValue );
-}
-
-ValuePointer CodeGenerator::generate( const ast::LogicAndExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateAnd( rightValue );
-}
-
-ValuePointer CodeGenerator::generate( const ast::LogicOrExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateOr( rightValue );
-}
-
-ValuePointer CodeGenerator::generate( const ast::LessExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateLess( rightValue );
-}
-
-ValuePointer CodeGenerator::generate( const ast::GreaterExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    return leftValue->generateGreater( rightValue );
+    return leftValue->generateBinaryOperation( expression.getOperation(), rightValue );
 }
 
 ValuePointer CodeGenerator::generate( const ast::CallExpression &expression ) {
 
-    ast::ExpressionPointer callee = expression.getCallee();
+    ValuePointer callee = generate( expression.getCallee() );
 
     std::vector<ValuePointer> arguments( expression.getArguments().size() );
 
-    for( size_t i = 0; i < arguments.size(); ++i ) {
-        arguments[i] = generate( expression.getArguments()[i] );
-    }
+    std::transform(
+        expression.getArguments().cbegin(),
+        expression.getArguments().cend(),
+        arguments.begin(),
+        [&]( ast::ExpressionPointer expression ) -> ValuePointer {
+            return CodeGenerator::generate( expression );
+        });
 
-    return generate( callee )->generateCall( arguments );
-}
-
-void CodeGenerator::generateVoid( ast::ExpressionPointer expression ) {
-
-#define _8b_generate_void_expression( TYPE )                         \
-    if( expression->instanceOf<TYPE>() ) {                           \
-        generateVoid( *std::static_pointer_cast<TYPE>(expression) ); \
-        return;                                                      \
-    }
-
-    _8b_generate_void_expression( ast::AssignmentExpression );
-    _8b_generate_void_expression( ast::IncrementExpression );
-    _8b_generate_void_expression( ast::DecrementExpression );
-
-    generate( expression );
-}
-
-void CodeGenerator::generateVoid( const ast::AssignmentExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getLeftOperand() );
-    ValuePointer rightValue = generate( expression.getRightOperand() );
-    leftValue->generateAssignment( rightValue );
-}
-
-void CodeGenerator::generateVoid( const ast::IncrementExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getOperand() );
-    leftValue->generateIncrement();
-}
-
-void CodeGenerator::generateVoid( const ast::DecrementExpression &expression ) {
-    ValuePointer leftValue = generate( expression.getOperand() );
-    leftValue->generateDecrement();
+    return callee->generateCall( arguments );
 }
 
 llvm::BasicBlock* CodeGenerator::insertBasicBlock( const std::string &name ) {
     return llvm::BasicBlock::Create( globalLLVMContext, name, _llvmFunction );
+}
+
+ValueTypePointer CodeGenerator::valueTypeByAstType( ast::TypePointer astType ) {
+    if( astType->instanceOf<ast::IntegerType>() )
+        return IntegerType::get();
+    if( astType->instanceOf<ast::BooleanType>() )
+        return BooleanType::get();
 }
 
 }

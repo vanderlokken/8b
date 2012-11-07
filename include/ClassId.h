@@ -9,7 +9,7 @@ public:
     }
 
 protected:
-        size_t _typeId;
+    size_t _typeId;
 };
 
 

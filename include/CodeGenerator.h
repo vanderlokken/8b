@@ -30,22 +30,13 @@ private:
     ValuePointer generate( const ast::IdentifierExpression& );
     ValuePointer generate( const ast::IntegerConstantExpression& );
     ValuePointer generate( const ast::BooleanConstantExpression& );
-    ValuePointer generate( const ast::AdditionExpression& );
-    ValuePointer generate( const ast::SubtractionExpression& );
-    ValuePointer generate( const ast::MultiplicationExpression& );
-    ValuePointer generate( const ast::DivisionExpression& );
-    ValuePointer generate( const ast::LogicAndExpression& );
-    ValuePointer generate( const ast::LogicOrExpression& );
-    ValuePointer generate( const ast::LessExpression& );
-    ValuePointer generate( const ast::GreaterExpression& );
+    ValuePointer generate( const ast::UnaryOperationExpression& );
+    ValuePointer generate( const ast::BinaryOperationExpression& );
     ValuePointer generate( const ast::CallExpression& );
 
-    void generateVoid( ast::ExpressionPointer );
-    void generateVoid( const ast::AssignmentExpression& );
-    void generateVoid( const ast::IncrementExpression& );
-    void generateVoid( const ast::DecrementExpression& );
-
     llvm::BasicBlock* insertBasicBlock( const std::string& );
+
+    static ValueTypePointer valueTypeByAstType( ast::TypePointer );
 
     llvm::Function *_llvmFunction;
     SymbolTable _symbolTable;

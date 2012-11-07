@@ -1,5 +1,6 @@
 #include "Value.h"
 
+#include <llvm/Argument.h>
 #include <llvm/Constants.h>
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/Type.h>
@@ -13,6 +14,52 @@ extern llvm::IRBuilder<> irBuilder;
 
 // Value
 
+ValuePointer Value::createVariable( ValueTypePointer type, const std::string &identifier ) {
+    Value *variable = new Value();
+    variable->_type = type;
+    variable->_llvmValue = irBuilder.CreateAlloca( type->toLlvm() );
+    variable->_llvmValue->setName( identifier );
+    return ValuePointer( variable );
+}
+
+ValuePointer Value::createArgument( ValueTypePointer type, const std::string &identifier ) {
+    Value *argument = new Value();
+    argument->_type = type;
+    argument->_llvmValue = new llvm::Argument( type->toLlvm() );
+    argument->_llvmValue->setName( identifier );
+    return ValuePointer( argument );
+}
+
+ValuePointer Value::createSsaValue( ValueTypePointer type, llvm::Value *value ) {
+    Value *ssaValue = new Value();
+    ssaValue->_type = type;
+    ssaValue->_llvmValue = value;
+    return ValuePointer( ssaValue );
+}
+
+ValuePointer Value::createUnusableValue() {
+    class UnusableType : public _ValueType<UnusableType> {};
+    static const ValueTypePointer type( new UnusableType() );
+    static const ValuePointer value( Value::createSsaValue(type, nullptr) );
+    return value;
+}
+
+ValuePointer Value::createIntegerConstant( int value ) {
+    return Value::createSsaValue(
+        IntegerType::get(),
+        llvm::ConstantInt::get(IntegerType::get()->toLlvm(), value) );
+}
+
+ValuePointer Value::createBooleanConstant( bool value ) {
+    return Value::createSsaValue(
+        BooleanType::get(),
+        llvm::ConstantInt::get(BooleanType::get()->toLlvm(), value) );
+}
+
+ValueTypePointer Value::getType() const {
+    return _type;
+}
+
 llvm::Value* Value::getLlvmValue() const {
 
     if( llvm::AllocaInst::classof(_llvmValue) )
@@ -21,212 +68,230 @@ llvm::Value* Value::getLlvmValue() const {
         return _llvmValue;
 }
 
-ValuePointer Value::generateAdd( ValuePointer ) const {
-    throwRuntimeError( "Unsupported operation" );
+llvm::Value* Value::getRawLlvmValue() const {
+    return _llvmValue;
+}
+
+ValuePointer Value::generateBinaryOperation( BinaryOperation operation, ValuePointer rightOperand ) const {
+    return _type->generateBinaryOperation( operation, shared_from_this(), rightOperand );
+}
+
+ValuePointer Value::generateUnaryOperation( UnaryOperation operation ) const {
+    return _type->generateUnaryOperation( operation, shared_from_this() );
+}
+
+ValuePointer Value::generateCall( const std::vector<ValuePointer> &arguments ) const {
+    return _type->generateCall( shared_from_this(), arguments );
+}
+
+ValuePointer Value::toBoolean() const {
+    return _type->generateUnaryOperation( UnaryOperation::BooleanConversion, shared_from_this() );
+}
+
+ValuePointer Value::toInteger() const {
+    return _type->generateUnaryOperation( UnaryOperation::IntegerConversion, shared_from_this() );
+}
+
+
+// ValueType
+
+llvm::Type* ValueType::toLlvm() const {
+    return _type;
+}
+
+ValuePointer ValueType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
+    throwRuntimeError( "This type doesn't implement specified operation" );
     return 0;
 }
 
-ValuePointer Value::generateSubtract( ValuePointer ) const {
-    throwRuntimeError( "Unsupported operation" );
+ValuePointer ValueType::generateUnaryOperation( UnaryOperation operation, ValuePointer operand ) const {
+    throwRuntimeError( "This type doesn't implement specified operation" );
     return 0;
 }
 
-ValuePointer Value::generateMultiply( ValuePointer ) const {
-    throwRuntimeError( "Unsupported operation" );
-    return 0;
-}
-
-ValuePointer Value::generateDivide( ValuePointer ) const {
-    throwRuntimeError( "Unsupported operation" );
-    return 0;
-}
-
-BooleanValuePointer Value::generateAnd( ValuePointer operand ) const {
-    llvm::Value *left =
-        instanceOf<BooleanValue>() ? getLlvmValue() : generateToBoolean()->getLlvmValue();
-    llvm::Value *right =
-        operand->instanceOf<BooleanValue>() ? operand->getLlvmValue() : operand->generateToBoolean()->getLlvmValue();
-    return BooleanValue::create( irBuilder.CreateAnd(left, right) );
-}
-
-BooleanValuePointer Value::generateOr( ValuePointer operand ) const {
-    llvm::Value *left =
-        instanceOf<BooleanValue>() ? getLlvmValue() : generateToBoolean()->getLlvmValue();
-    llvm::Value *right =
-        operand->instanceOf<BooleanValue>() ? operand->getLlvmValue() : operand->generateToBoolean()->getLlvmValue();
-    return BooleanValue::create( irBuilder.CreateOr(left, right) );
-}
-
-BooleanValuePointer Value::generateLess( ValuePointer ) const {
-    throwRuntimeError( "Unsupported operation" );
-    return 0;
-}
-
-BooleanValuePointer Value::generateGreater( ValuePointer ) const {
-    throwRuntimeError( "Unsupported operation" );
-    return 0;
-}
-
-void Value::generateIncrement() const {
-    throwRuntimeError( "Unsupported operation" );
-}
-
-void Value::generateDecrement() const {
-    throwRuntimeError( "Unsupported operation" );
-}
-
-BooleanValuePointer Value::generateToBoolean() const {
-    throwRuntimeError( "The value cannot be represented as a boolean value" );
-    return 0;
-}
-
-IntegerValuePointer Value::generateToInteger() const {
-    throwRuntimeError( "The value cannot be represented as an integer value" );
-    return 0;
-}
-
-ValuePointer Value::generateCall( const std::vector<ValuePointer>& ) const {
-    throwRuntimeError( "The value cannot be called" );
+ValuePointer ValueType::generateCall( ValuePointer, const std::vector<ValuePointer>& ) const {
+    throwRuntimeError( "This type doesn't implement invokation" );
     return 0;
 }
 
 
-// IntegerValue
+// IntegerType
 
-IntegerValuePointer IntegerValue::create( const std::string &name, int bitWidth ) {
-    return std::make_shared<IntegerValue>( name, bitWidth );
+ValueTypePointer IntegerType::get( int bitWidth ) {
+
+    if( bitWidth != 32 )
+        throwRuntimeError( "Not supported" );
+
+    static const ValueTypePointer instance( new IntegerType(bitWidth) );
+    return instance;
 }
 
-IntegerValuePointer IntegerValue::create( int value ) {
-    return std::make_shared<IntegerValue>( value );
+IntegerType::IntegerType( int bitWidth ) {
+    _type = llvm::IntegerType::get( globalLLVMContext, bitWidth );
 }
 
-IntegerValuePointer IntegerValue::create( llvm::Value *value ) {
-    return std::make_shared<IntegerValue>( value );
+ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
+
+    if( operation == BinaryOperation::Assignment ) {
+
+        if( !llvm::AllocaInst::classof(first->getRawLlvmValue()) )
+            throwRuntimeError( "An assignment to a temporary value is not possible" );
+
+        irBuilder.CreateStore( integerOperand(second), first->getRawLlvmValue() );
+
+        return Value::createUnusableValue();
+    }
+
+    if( operation == BinaryOperation::Addition )
+        return Value::createSsaValue( IntegerType::get(),
+            irBuilder.CreateAdd(integerOperand(first), integerOperand(second)) );
+
+    if( operation == BinaryOperation::Subtraction )
+        return Value::createSsaValue( IntegerType::get(),
+            irBuilder.CreateSub(integerOperand(first), integerOperand(second)) );
+
+    if( operation == BinaryOperation::Multiplication )
+        return Value::createSsaValue( IntegerType::get(),
+            irBuilder.CreateMul(integerOperand(first), integerOperand(second)) );
+
+    if( operation == BinaryOperation::Division )
+        return Value::createSsaValue( IntegerType::get(),
+            irBuilder.CreateSDiv(integerOperand(first), integerOperand(second)) );
+
+    if( operation == BinaryOperation::LogicOr )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateOr(
+                first->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue(),
+                second->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue()) );
+
+    if( operation == BinaryOperation::LogicAnd )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateAnd(
+                first->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue(),
+                second->generateUnaryOperation(UnaryOperation::BooleanConversion)->getLlvmValue()) );
+
+    if( operation == BinaryOperation::LessComparison )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateICmpSLT(integerOperand(first), integerOperand(second)) );
+
+    if( operation == BinaryOperation::GreaterComparison )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateICmpSGT(integerOperand(first), integerOperand(second)) );
+    
+    return ValueType::generateBinaryOperation( operation, first, second );
 }
 
-IntegerValue::IntegerValue( const std::string &name, int bitWidth ) {
-    llvm::Type *type = llvm::IntegerType::get( globalLLVMContext, bitWidth );
-    _llvmValue = irBuilder.CreateAlloca( type );
-    _llvmValue->setName( name );
+ValuePointer IntegerType::generateUnaryOperation( UnaryOperation operation, ValuePointer operand ) const {
+
+    if( operation == UnaryOperation::BooleanConversion )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateIsNotNull(integerOperand(operand)) );
+
+    if( operation == UnaryOperation::IntegerConversion )
+        return operand;
+
+    if( operation == UnaryOperation::Increment ) {
+
+        ValuePointer incremented = generateBinaryOperation(
+            BinaryOperation::Addition, operand, Value::createIntegerConstant(1) );
+
+        return generateBinaryOperation(
+            BinaryOperation::Assignment, operand, incremented );
+    }
+
+    if( operation == UnaryOperation::Decrement ) {
+
+        ValuePointer decremented = generateBinaryOperation(
+            BinaryOperation::Subtraction, operand, Value::createIntegerConstant(1) );
+
+        return generateBinaryOperation(
+            BinaryOperation::Assignment, operand, decremented );
+    }
+
+    return ValueType::generateUnaryOperation( operation, operand );
 }
 
-IntegerValue::IntegerValue( int value ) {
-    _llvmValue = llvm::ConstantInt::get(
-        globalLLVMContext, llvm::APInt(32, value, false) );
-}
-
-ValuePointer IntegerValue::generateAdd( ValuePointer operand ) const {
-    return IntegerValue::create( irBuilder.CreateAdd(getLlvmValue(), integerOperand(operand)) );
-}
-
-ValuePointer IntegerValue::generateSubtract( ValuePointer operand ) const {
-    return IntegerValue::create( irBuilder.CreateSub(getLlvmValue(), integerOperand(operand)) );
-}
-
-ValuePointer IntegerValue::generateMultiply( ValuePointer operand ) const {
-    return IntegerValue::create( irBuilder.CreateMul(getLlvmValue(), integerOperand(operand)) );
-}
-
-ValuePointer IntegerValue::generateDivide( ValuePointer operand ) const {
-    return IntegerValue::create( irBuilder.CreateSDiv(getLlvmValue(), integerOperand(operand)) );
-}
-
-BooleanValuePointer IntegerValue::generateLess( ValuePointer operand ) const {
-    return BooleanValue::create( irBuilder.CreateICmpSLT(getLlvmValue(), integerOperand(operand)) );
-}
-
-BooleanValuePointer IntegerValue::generateGreater( ValuePointer operand ) const {
-    return BooleanValue::create( irBuilder.CreateICmpSGT(getLlvmValue(), integerOperand(operand)) );
-}
-
-void IntegerValue::generateAssignment( ValuePointer operand ) const {
-    if( !llvm::AllocaInst::classof(_llvmValue) )
-        throwRuntimeError( "An assignment to a temporary value is not possible" );
-    irBuilder.CreateStore( integerOperand(operand), _llvmValue );
-}
-
-void IntegerValue::generateIncrement() const {
-    generateAssignment( generateAdd(IntegerValue::create(1)) );
-}
-
-void IntegerValue::generateDecrement() const {
-    generateAssignment( generateSubtract(IntegerValue::create(1)) );
-}
-
-BooleanValuePointer IntegerValue::generateToBoolean() const {
-    return BooleanValue::create( irBuilder.CreateIsNotNull(getLlvmValue()) );
-}
-
-llvm::Value* IntegerValue::integerOperand( ValuePointer operand ) {
-    if( operand->instanceOf<BooleanValue>() )
-        operand = operand->generateToInteger();
-    if( !operand->instanceOf<IntegerValue>() )
+llvm::Value* IntegerType::integerOperand( ValuePointer operand ) {
+    
+    if( operand->getType()->instanceOf<BooleanType>() )
+        operand = operand->toInteger();
+    
+    if( !operand->getType()->instanceOf<IntegerType>() )
         throwRuntimeError( "Not implemented or not supported" );
+    
     return operand->getLlvmValue();
 }
 
 
-// BooleanValue
+// BooleanType
 
-BooleanValuePointer BooleanValue::create( const std::string &name ) {
-    return std::make_shared<BooleanValue>( name );
+ValueTypePointer BooleanType::get() {
+    static const ValueTypePointer instance( new BooleanType() );
+    return instance;
 }
 
-BooleanValuePointer BooleanValue::create( bool value ) {
-    return std::make_shared<BooleanValue>( value );
+BooleanType::BooleanType() {
+    _type = llvm::Type::getInt1Ty( globalLLVMContext );
 }
 
-BooleanValuePointer BooleanValue::create( llvm::Value *value ) {
-    return std::make_shared<BooleanValue>( value );
+ValuePointer BooleanType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
+    
+    return ValueType::generateBinaryOperation( operation, first, second );
 }
 
-BooleanValue::BooleanValue( const std::string &name ) {
-    llvm::Type *type = llvm::Type::getInt1Ty( globalLLVMContext );
-    _llvmValue = irBuilder.CreateAlloca( type );
-    _llvmValue->setName( name );
-}
+ValuePointer BooleanType::generateUnaryOperation( UnaryOperation operation, ValuePointer operand ) const {
 
-BooleanValue::BooleanValue( bool value ) {
-    llvm::Type *type = llvm::Type::getInt1Ty( globalLLVMContext );
-    if( value )
-        _llvmValue = llvm::ConstantInt::getTrue( type );
-    else
-        _llvmValue = llvm::ConstantInt::getFalse( type );
-}
+    if( operation == UnaryOperation::BooleanConversion )
+        return operand;
 
-void BooleanValue::generateAssignment( ValuePointer operand ) const {
-    if( !llvm::AllocaInst::classof(_llvmValue) )
-        throwRuntimeError( "An assignment to a temporary value is not possible" );
-    irBuilder.CreateStore( operand->generateToBoolean()->getLlvmValue(), _llvmValue );
-}
+    if( operation == UnaryOperation::IntegerConversion )
+        return Value::createSsaValue( IntegerType::get(),
+            irBuilder.CreateZExt(operand->getLlvmValue(), IntegerType::get()->toLlvm()) );
 
-IntegerValuePointer BooleanValue::generateToInteger() const {
-    llvm::Value *converted = irBuilder.CreateZExt(
-        getLlvmValue(), llvm::Type::getInt32Ty(globalLLVMContext) );
-    return IntegerValue::create( converted );
+    return ValueType::generateUnaryOperation( operation, operand );
 }
 
 
-// FunctionValue
+// FunctionType
 
-FunctionValuePointer FunctionValue::create( llvm::Value *value ) {
-    return std::make_shared<FunctionValue>( value );
+FunctionType::FunctionType( const std::vector<ValueTypePointer> &argumentTypes, ValueTypePointer resultType )
+    : _resultType( resultType )
+{
+    const bool isVariableArgument = false;
+    
+    std::vector<llvm::Type*> llvmArgumentTypes( argumentTypes.size() );
+
+    std::transform(
+        argumentTypes.cbegin(),
+        argumentTypes.cend(),
+        llvmArgumentTypes.begin(),
+        []( ValueTypePointer type ) -> llvm::Type* {
+            return type->toLlvm();
+        });
+
+    llvm::Type *llvmResultType = _resultType ? _resultType->toLlvm() : llvm::Type::getVoidTy( globalLLVMContext );
+
+    _type = llvm::FunctionType::get( llvmResultType, llvmArgumentTypes, isVariableArgument );
 }
 
-void FunctionValue::generateAssignment( ValuePointer operand ) const {
-    throwRuntimeError( "Not implemented or not supported" );
-}
-
-ValuePointer FunctionValue::generateCall( const std::vector<ValuePointer> &arguments ) const {
+ValuePointer FunctionType::generateCall( ValuePointer callee, const std::vector<ValuePointer> &arguments ) const {
 
     std::vector<llvm::Value*> llvmArguments( arguments.size() );
 
-    for( size_t i = 0; i < llvmArguments.size(); ++i ) {
-        llvmArguments[i] = arguments[i]->getLlvmValue();
-    }
+    std::transform(
+        arguments.cbegin(),
+        arguments.cend(),
+        llvmArguments.begin(),
+        []( ValuePointer value ) -> llvm::Value* {
+            return value->getLlvmValue();
+        });
 
-    return IntegerValue::create( irBuilder.CreateCall(getLlvmValue(), llvmArguments) );
+    llvm::Value *llvmResultValue = irBuilder.CreateCall( callee->getLlvmValue(), llvmArguments );
+
+    if( _resultType )
+        return Value::createSsaValue( _resultType, llvmResultValue );
+    else
+        return Value::createUnusableValue();
 }
 
 }

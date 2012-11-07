@@ -6,116 +6,100 @@
 #include <llvm/Value.h>
 
 #include "ClassId.h"
+#include "Operation.h"
 
 namespace _8b {
 
 
 class Value;
-typedef std::shared_ptr<Value> ValuePointer;
+typedef std::shared_ptr<const Value> ValuePointer;
 
-class IntegerValue;
-typedef std::shared_ptr<IntegerValue> IntegerValuePointer;
-
-class BooleanValue;
-typedef std::shared_ptr<BooleanValue> BooleanValuePointer;
-
-class FunctionValue;
-typedef std::shared_ptr<FunctionValue> FunctionValuePointer;
+class ValueType;
+typedef std::shared_ptr<ValueType> ValueTypePointer;
 
 
-class Value : public BaseIdClass {
+class Value : public std::enable_shared_from_this<Value> {
 public:
+
+    static ValuePointer createVariable( ValueTypePointer type, const std::string &identifier );
+    static ValuePointer createArgument( ValueTypePointer type, const std::string &identifier );
+    static ValuePointer createSsaValue( ValueTypePointer type, llvm::Value* );
+    static ValuePointer createUnusableValue();
+    static ValuePointer createIntegerConstant( int );
+    static ValuePointer createBooleanConstant( bool );
 
     Value() : _llvmValue( 0 ) {}
 
-    virtual ~Value() {}
-
+    ValueTypePointer getType() const;
     llvm::Value* getLlvmValue() const;
+    llvm::Value* getRawLlvmValue() const;
 
-    virtual ValuePointer generateAdd( ValuePointer ) const;
-    virtual ValuePointer generateSubtract( ValuePointer ) const;
-    virtual ValuePointer generateMultiply( ValuePointer ) const;
-    virtual ValuePointer generateDivide( ValuePointer ) const;
+    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer ) const;
+    ValuePointer generateUnaryOperation( UnaryOperation ) const;
+    ValuePointer generateCall( const std::vector<ValuePointer>& ) const;
 
-    virtual BooleanValuePointer generateOr( ValuePointer ) const;
-    virtual BooleanValuePointer generateAnd( ValuePointer ) const;
-    virtual BooleanValuePointer generateLess( ValuePointer ) const;
-    virtual BooleanValuePointer generateGreater( ValuePointer ) const;
+    ValuePointer toBoolean() const;
+    ValuePointer toInteger() const;
 
-    virtual void generateAssignment( ValuePointer ) const = 0;
-    virtual void generateIncrement() const;
-    virtual void generateDecrement() const;
-
-    virtual BooleanValuePointer generateToBoolean() const;
-    virtual IntegerValuePointer generateToInteger() const;
-
-    virtual ValuePointer generateCall( const std::vector<ValuePointer>& ) const;
-    
 protected:
+    ValueTypePointer _type;
     llvm::Value *_llvmValue;
 };
 
-template<class T>
-class ValueType : public DerivedIdClass<Value, T> {};
 
-
-class IntegerValue : public ValueType<IntegerValue> {
+class ValueType : public BaseIdClass {
 public:
+    virtual ~ValueType() {}
 
-    static IntegerValuePointer create( const std::string &name, int bitWidth = 32 );
-    static IntegerValuePointer create( int value );
-    static IntegerValuePointer create( llvm::Value *value );
+    virtual llvm::Type* toLlvm() const;
 
-    ValuePointer generateAdd( ValuePointer ) const;
-    ValuePointer generateSubtract( ValuePointer ) const;
-    ValuePointer generateMultiply( ValuePointer ) const;
-    ValuePointer generateDivide( ValuePointer ) const;
+    virtual ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
+    virtual ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
+    virtual ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
 
-    BooleanValuePointer generateLess( ValuePointer ) const;
-    BooleanValuePointer generateGreater( ValuePointer ) const;
+protected:
+    llvm::Type *_type;
+};
 
-    void generateAssignment( ValuePointer ) const;
-    void generateIncrement() const;
-    void generateDecrement() const;
 
-    BooleanValuePointer generateToBoolean() const;
+template<class T>
+class _ValueType : public DerivedIdClass<ValueType, T> {};
 
-    IntegerValue( const std::string &name, int bitWidth );
-    IntegerValue( int value );
-    IntegerValue( llvm::Value *value ) { _llvmValue = value; }
+
+class IntegerType : public _ValueType<IntegerType> {
+public:
+    static ValueTypePointer get( int bitWidth = 32 );
+
+    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
+    ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
 
 private:
+    IntegerType( int bitWidth );
+
     static llvm::Value* integerOperand( ValuePointer );
 };
 
 
-class BooleanValue : public ValueType<BooleanValue> {
+class BooleanType : public _ValueType<BooleanType> {
 public:
+    static ValueTypePointer get();
 
-    static BooleanValuePointer create( const std::string &name );
-    static BooleanValuePointer create( bool );
-    static BooleanValuePointer create( llvm::Value *value );
+    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
+    ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
 
-    void generateAssignment( ValuePointer ) const;
-
-    IntegerValuePointer generateToInteger() const;
-
-    BooleanValue( const std::string &name );
-    BooleanValue( bool );
-    BooleanValue( llvm::Value *value ) { _llvmValue = value; }
+private:
+    BooleanType();
 };
 
 
-class FunctionValue : public ValueType<FunctionValue> {
+class FunctionType : public _ValueType<FunctionType> {
 public:
+    FunctionType( const std::vector<ValueTypePointer>&, ValueTypePointer resultType = nullptr );
 
-    static FunctionValuePointer create( llvm::Value *value );
+    ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
 
-    void generateAssignment( ValuePointer ) const;
-
-    ValuePointer generateCall( const std::vector<ValuePointer>& ) const;
-    
-    FunctionValue( llvm::Value *value ) { _llvmValue = value; }
+private:
+    ValueTypePointer _resultType;
 };
 
 }

@@ -6,6 +6,7 @@
 #include "CheckToken.h"
 #include "ClassId.h"
 #include "LexicalAnalyser.h"
+#include "Operation.h"
 
 namespace _8b {
 namespace ast {
@@ -60,67 +61,34 @@ private:
 };
 
 
-int getLeftBindingPower( Token::Type );
-
-
-template<Token::Type tokenType>
-class BinaryOperatorExpression : public ExpressionType< BinaryOperatorExpression<tokenType> > {
+class BinaryOperationExpression : public ExpressionType< BinaryOperationExpression > {
 public:
 
-    BinaryOperatorExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer leftOperand )
-        : _leftOperand( leftOperand )
-    {
-        checkToken( lexicalAnalyser.extractToken(), tokenType );
-        _rightOperand = Expression::parse( lexicalAnalyser, getLeftBindingPower(tokenType) );
-    }
+    BinaryOperationExpression( BinaryOperation, ExpressionPointer leftOperand, ExpressionPointer rightOperand );
 
-    ExpressionPointer getLeftOperand() const {
-        return _leftOperand;
-    }
-
-    ExpressionPointer getRightOperand() const {
-        return _rightOperand;
-    }
+    BinaryOperation getOperation() const;
+    ExpressionPointer getLeftOperand() const;
+    ExpressionPointer getRightOperand() const;
 
 protected:
+    BinaryOperation _operation;
     ExpressionPointer _leftOperand;
     ExpressionPointer _rightOperand;
 };
 
 
-typedef BinaryOperatorExpression< Token::Operator_Assign > AssignmentExpression;
-typedef BinaryOperatorExpression< Token::Keyword_And > LogicAndExpression;
-typedef BinaryOperatorExpression< Token::Keyword_Or > LogicOrExpression;
-typedef BinaryOperatorExpression< Token::Operator_Plus > AdditionExpression;
-typedef BinaryOperatorExpression< Token::Operator_Minus > SubtractionExpression;
-typedef BinaryOperatorExpression< Token::Operator_Multiply > MultiplicationExpression;
-typedef BinaryOperatorExpression< Token::Operator_Divide > DivisionExpression;
-typedef BinaryOperatorExpression< Token::Operator_Less > LessExpression;
-typedef BinaryOperatorExpression< Token::Operator_Greater > GreaterExpression;
-
-
-template<Token::Type tokenType>
-class PostfixUnaryOperatorExpression : public ExpressionType< PostfixUnaryOperatorExpression<tokenType> > {
+class UnaryOperationExpression : public ExpressionType< UnaryOperationExpression > {
 public:
 
-    PostfixUnaryOperatorExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer operand )
-        : _operand( operand )
-    {
-        _operand = operand;
-        checkToken( lexicalAnalyser.extractToken(), tokenType );
-    }
+    UnaryOperationExpression( UnaryOperation, ExpressionPointer operand );
 
-    ExpressionPointer getOperand() const {
-        return _operand;
-    }
+    UnaryOperation getOperation() const;
+    ExpressionPointer getOperand() const;
 
 protected:
+    UnaryOperation _operation;
     ExpressionPointer _operand;
 };
-
-
-typedef PostfixUnaryOperatorExpression< Token::Operator_Increment > IncrementExpression;
-typedef PostfixUnaryOperatorExpression< Token::Operator_Decrement > DecrementExpression;
 
 
 class CallExpression : public ExpressionType<CallExpression> {
@@ -135,6 +103,8 @@ private:
     std::vector<ExpressionPointer> _arguments;
 };
 
+
+int getLeftBindingPower( Token::Type );
 
 }
 }
