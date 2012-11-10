@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "CheckToken.h"
 #include "ClassId.h"
 #include "LexicalAnalyser.h"
 #include "Operation.h"

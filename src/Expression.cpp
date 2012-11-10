@@ -31,9 +31,9 @@ ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser )
         return std::make_shared<IntegerConstantExpression>( lexicalAnalyser );
 
     if( tokenType == Token::Punctuator_OpeningParenthesis ) {
-        checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_OpeningParenthesis );
+        lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
         ExpressionPointer expression = Expression::parse( lexicalAnalyser );
-        checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_ClosingParenthesis );
+        lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
         return expression;
     }
 
@@ -99,12 +99,9 @@ ExpressionPointer Expression::leftDenotation( LexicalAnalyser &lexicalAnalyser, 
     return expression;
 }
 
-IdentifierExpression::IdentifierExpression( LexicalAnalyser &lexicalAnalyser ) {
-
-    Token token = lexicalAnalyser.extractToken();
-    checkToken( token, Token::Identifier );
-
-    _identifier = token.getLexem();
+IdentifierExpression::IdentifierExpression( LexicalAnalyser &lexicalAnalyser )
+    : _identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
+{
 }
 
 const std::string& IdentifierExpression::getIdentifier() const {
@@ -114,11 +111,8 @@ const std::string& IdentifierExpression::getIdentifier() const {
 MemberAccessExpression::MemberAccessExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer operand )
     : _operand( operand )
 {
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_Dot );
-    
-    Token token = lexicalAnalyser.extractToken();
-    checkToken( token, Token::Identifier );
-    _identifier = token.getLexem();
+    lexicalAnalyser.extractToken( Token::Punctuator_Dot );
+    _identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
 }
 
 ExpressionPointer MemberAccessExpression::getOperand() const {
@@ -130,12 +124,8 @@ const std::string& MemberAccessExpression::getMemberIdentifier() const {
 }
 
 IntegerConstantExpression::IntegerConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
-
-    Token token = lexicalAnalyser.extractToken();
-    checkToken( token, Token::Constant_Integer );
-
     std::stringstream stream;
-    stream << token.getLexem();
+    stream << lexicalAnalyser.extractToken( Token::Constant_Integer ).getLexem();
     stream >> _value;
 }
 
@@ -160,8 +150,13 @@ bool BooleanConstantExpression::getValue() const {
 }
 
 
-BinaryOperationExpression::BinaryOperationExpression( BinaryOperation operation, ExpressionPointer leftOperand, ExpressionPointer rightOperand )
-    : _operation( operation ), _leftOperand( leftOperand ), _rightOperand( rightOperand )
+BinaryOperationExpression::BinaryOperationExpression(
+    BinaryOperation operation,
+    ExpressionPointer leftOperand,
+    ExpressionPointer rightOperand )
+      : _operation( operation ),
+        _leftOperand( leftOperand ),
+        _rightOperand( rightOperand )
 {
 }
 
@@ -195,17 +190,17 @@ ExpressionPointer UnaryOperationExpression::getOperand() const {
 CallExpression::CallExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer callee )
     : _callee( callee )
 {
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_OpeningParenthesis );
+    lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
 
     while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingParenthesis ) {
 
         if( !_arguments.empty() )
-            checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_Comma );
+            lexicalAnalyser.extractToken( Token::Punctuator_Comma );
 
         _arguments.push_back( Expression::parse(lexicalAnalyser) );
     }
 
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_ClosingParenthesis );
+    lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
 }
 
 ExpressionPointer CallExpression::getCallee() const {

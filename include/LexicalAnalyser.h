@@ -15,7 +15,8 @@ public:
     Token getNextToken() const noexcept;
     
     Token extractToken();
-    
+    Token extractToken( Token::Type );
+
 private:
     Token readToken();
     

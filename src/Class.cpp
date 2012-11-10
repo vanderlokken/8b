@@ -1,18 +1,15 @@
 #include "Class.h"
 
-#include "CheckToken.h"
-
 namespace _8b {
 namespace ast{
 
 Class::Class( LexicalAnalyser &lexicalAnalyser ) {
 
-    checkToken( lexicalAnalyser.extractToken(), Token::Keyword_Class );
+    lexicalAnalyser.extractToken( Token::Keyword_Class );
 
-    checkToken( lexicalAnalyser.getCurrentToken(), Token::Identifier );
-    _identifier = lexicalAnalyser.extractToken().getLexem();
+    _identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
 
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_OpeningBrace );
+    lexicalAnalyser.extractToken( Token::Punctuator_OpeningBrace );
 
     while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingBrace ) {
         if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_Variable )
@@ -21,7 +18,7 @@ Class::Class( LexicalAnalyser &lexicalAnalyser ) {
             _methods.push_back( Function(lexicalAnalyser) );
     }
 
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_ClosingBrace );
+    lexicalAnalyser.extractToken( Token::Punctuator_ClosingBrace );
 }
 
 const std::string& Class::getIdentifier() const {

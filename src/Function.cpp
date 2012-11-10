@@ -1,7 +1,5 @@
 #include "Function.h"
 
-#include "CheckToken.h"
-
 namespace _8b {
 namespace ast{
 
@@ -9,30 +7,29 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
     
     // Read "function" keyword
     
-    checkToken( lexicalAnalyser.extractToken(), Token::Keyword_Function );
+    lexicalAnalyser.extractToken( Token::Keyword_Function );
     
     // Read identifier
     
-    checkToken( lexicalAnalyser.getCurrentToken(), Token::Identifier );
-    _identifier = lexicalAnalyser.extractToken().getLexem();
+    _identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
     
     // Read arguments
     
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_OpeningParenthesis );
+    lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
 
     while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingParenthesis ) {
 
         if( !_arguments.empty() )
-            checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_Comma );
+            lexicalAnalyser.extractToken( Token::Punctuator_Comma );
         
-        Token token = lexicalAnalyser.extractToken();
-        checkToken( token, Token::Identifier );
-
-        Argument argument = { token.getLexem(), Type::parse(lexicalAnalyser) };
+        Argument argument = {
+            lexicalAnalyser.extractToken( Token::Identifier ).getLexem(),
+            Type::parse(lexicalAnalyser)
+        };
         _arguments.push_back( argument );
     }
 
-    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_ClosingParenthesis );
+    lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
 
     // Read return type
 

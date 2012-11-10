@@ -1,6 +1,5 @@
 #include "Type.h"
 
-#include "CheckToken.h"
 #include "Exception.h"
 
 namespace _8b {
@@ -19,11 +18,11 @@ TypePointer Type::parse( LexicalAnalyser &lexicalAnalyser ) {
 }
 
 IntegerType::IntegerType( LexicalAnalyser &lexicalAnalyser ) {
-    checkToken( lexicalAnalyser.extractToken(), Token::Keyword_Integer );
+    lexicalAnalyser.extractToken( Token::Keyword_Integer );
 }
 
 BooleanType::BooleanType( LexicalAnalyser &lexicalAnalyser ) {
-    checkToken( lexicalAnalyser.extractToken(), Token::Keyword_Boolean );
+    lexicalAnalyser.extractToken( Token::Keyword_Boolean );
 }
 
 }

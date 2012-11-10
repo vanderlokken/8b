@@ -2,6 +2,7 @@
 
 #include <regex>
 
+#include "CheckToken.h"
 #include "Exception.h"
 
 namespace _8b {
@@ -31,6 +32,11 @@ Token LexicalAnalyser::extractToken() {
     _nextToken = readToken();
     
     return result;
+}
+
+Token LexicalAnalyser::extractToken( Token::Type tokenType ) {
+    checkToken( getCurrentToken(), tokenType );
+    return extractToken();
 }
 
 Token LexicalAnalyser::readToken() {
