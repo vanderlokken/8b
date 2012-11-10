@@ -71,6 +71,10 @@ ValuePointer Value::generateCall( const std::vector<ValuePointer> &arguments ) c
     return _type->generateCall( shared_from_this(), arguments );
 }
 
+ValuePointer Value::generateMemberAccess( const std::string &memberIdentifier ) const {
+    return _type->generateMemberAccess( shared_from_this(), memberIdentifier );
+}
+
 ValuePointer Value::toBoolean() const {
     return _type->generateUnaryOperation( UnaryOperation::BooleanConversion, shared_from_this() );
 }
@@ -103,6 +107,11 @@ ValuePointer ValueType::generateUnaryOperation( UnaryOperation operation, ValueP
 
 ValuePointer ValueType::generateCall( ValuePointer, const std::vector<ValuePointer>& ) const {
     throwRuntimeError( "This type doesn't implement invokation" );
+    return 0;
+}
+
+ValuePointer ValueType::generateMemberAccess( ValuePointer, const std::string& ) const {
+    throwRuntimeError( "Not implemented or this type doesn't have specified property" );
     return 0;
 }
 

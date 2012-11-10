@@ -51,7 +51,6 @@ private:
 };
 
 
-
 class IntegerConstantExpression : public ExpressionType<IntegerConstantExpression> {
 public:
     IntegerConstantExpression( LexicalAnalyser& );

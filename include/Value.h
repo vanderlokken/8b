@@ -36,6 +36,7 @@ public:
     ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer ) const;
     ValuePointer generateUnaryOperation( UnaryOperation ) const;
     ValuePointer generateCall( const std::vector<ValuePointer>& ) const;
+    ValuePointer generateMemberAccess( const std::string &memberIdentifier ) const;
 
     ValuePointer toBoolean() const;
     ValuePointer toInteger() const;
@@ -55,6 +56,7 @@ public:
     virtual ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
     virtual ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
     virtual ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
+    virtual ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
 
 protected:
     llvm::Type *_type;

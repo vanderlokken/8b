@@ -28,6 +28,7 @@ private:
 
     ValuePointer generate( ast::ExpressionPointer );
     ValuePointer generate( const ast::IdentifierExpression& );
+    ValuePointer generate( const ast::MemberAccessExpression& );
     ValuePointer generate( const ast::IntegerConstantExpression& );
     ValuePointer generate( const ast::BooleanConstantExpression& );
     ValuePointer generate( const ast::UnaryOperationExpression& );

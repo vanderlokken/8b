@@ -210,6 +210,7 @@ ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
     }
 
     _8b_generate_expression( ast::IdentifierExpression );
+    _8b_generate_expression( ast::MemberAccessExpression );
     _8b_generate_expression( ast::IntegerConstantExpression );
     _8b_generate_expression( ast::BooleanConstantExpression );
     _8b_generate_expression( ast::UnaryOperationExpression );
@@ -221,6 +222,10 @@ ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
 
 ValuePointer CodeGenerator::generate( const ast::IdentifierExpression &expression ) {
     return _symbolTable.lookupSymbol( expression.getIdentifier() );
+}
+
+ValuePointer CodeGenerator::generate( const ast::MemberAccessExpression &expression ) {
+    return generate( expression.getOperand() )->generateMemberAccess( expression.getMemberIdentifier() );
 }
 
 ValuePointer CodeGenerator::generate( const ast::IntegerConstantExpression &expression ) {
