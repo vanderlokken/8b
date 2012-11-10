@@ -39,6 +39,20 @@ private:
 };
 
 
+class MemberAccessExpression : public ExpressionType<MemberAccessExpression> {
+public:
+    MemberAccessExpression( LexicalAnalyser&, ExpressionPointer );
+
+    ExpressionPointer getOperand() const;
+    const std::string& getMemberIdentifier() const;
+
+private:
+    ExpressionPointer _operand;
+    std::string _identifier;
+};
+
+
+
 class IntegerConstantExpression : public ExpressionType<IntegerConstantExpression> {
 public:
     IntegerConstantExpression( LexicalAnalyser& );

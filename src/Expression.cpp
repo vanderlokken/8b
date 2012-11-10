@@ -93,6 +93,9 @@ ExpressionPointer Expression::leftDenotation( LexicalAnalyser &lexicalAnalyser, 
     if( tokenType == Token::Punctuator_OpeningParenthesis )
         return std::make_shared<CallExpression>( lexicalAnalyser, expression );
 
+    if( tokenType == Token::Punctuator_Dot )
+        return std::make_shared<MemberAccessExpression>( lexicalAnalyser, expression );
+
     return expression;
 }
 
@@ -105,6 +108,24 @@ IdentifierExpression::IdentifierExpression( LexicalAnalyser &lexicalAnalyser ) {
 }
 
 const std::string& IdentifierExpression::getIdentifier() const {
+    return _identifier;
+}
+
+MemberAccessExpression::MemberAccessExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer operand )
+    : _operand( operand )
+{
+    checkToken( lexicalAnalyser.extractToken(), Token::Punctuator_Dot );
+    
+    Token token = lexicalAnalyser.extractToken();
+    checkToken( token, Token::Identifier );
+    _identifier = token.getLexem();
+}
+
+ExpressionPointer MemberAccessExpression::getOperand() const {
+    return _operand;
+}
+
+const std::string& MemberAccessExpression::getMemberIdentifier() const {
     return _identifier;
 }
 
@@ -233,7 +254,10 @@ int getLeftBindingPower( Token::Type tokenType ) {
 
     if( tokenType == Token::Punctuator_OpeningParenthesis )
         return 50;
-    
+
+    if( tokenType == Token::Punctuator_Dot )
+        return 60;
+
     return 0;
 }
 
