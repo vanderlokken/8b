@@ -24,6 +24,9 @@ ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser )
 
     const Token::Type tokenType = lexicalAnalyser.getCurrentToken().getType();
 
+    if( tokenType == Token::Keyword_Instance )
+        return std::make_shared<InstanceExpression>( lexicalAnalyser );
+
     if( tokenType == Token::Identifier )
         return std::make_shared<IdentifierExpression>( lexicalAnalyser );
 
@@ -97,6 +100,10 @@ ExpressionPointer Expression::leftDenotation( LexicalAnalyser &lexicalAnalyser, 
         return std::make_shared<MemberAccessExpression>( lexicalAnalyser, expression );
 
     return expression;
+}
+
+InstanceExpression::InstanceExpression( LexicalAnalyser &lexicalAnalyser ) {
+    lexicalAnalyser.extractToken( Token::Keyword_Instance );
 }
 
 IdentifierExpression::IdentifierExpression( LexicalAnalyser &lexicalAnalyser )

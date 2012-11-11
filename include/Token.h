@@ -20,6 +20,7 @@ public:
         Keyword_Constant,
         Keyword_If,
         Keyword_In,
+        Keyword_Instance,
         Keyword_Integer,
         Keyword_Else,
         Keyword_False,

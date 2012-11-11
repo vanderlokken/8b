@@ -27,6 +27,12 @@ template<class T>
 class ExpressionType : public DerivedIdClass<Expression, T> {};
 
 
+class InstanceExpression : public ExpressionType<InstanceExpression> {
+public:
+    InstanceExpression( LexicalAnalyser& );
+};
+
+
 class IdentifierExpression : public ExpressionType<IdentifierExpression> {
 public:
     IdentifierExpression( LexicalAnalyser& );
