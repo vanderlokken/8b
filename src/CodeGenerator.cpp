@@ -37,7 +37,7 @@ std::shared_ptr<llvm::Module> CodeGenerator::generate( const ast::Module &module
 
 void CodeGenerator::generate( const ast::Class &classDeclaration ) {
 
-    const std::vector<VariableDeclarationStatement> &memberDeclarations =
+    const std::vector<ast::VariableDeclarationStatement> &memberDeclarations =
         classDeclaration.getVariables();
 
     std::vector<ClassType::Member> members( memberDeclarations.size() );
@@ -47,11 +47,13 @@ void CodeGenerator::generate( const ast::Class &classDeclaration ) {
         memberDeclarations.cend(),
         members.begin(),
         [this]( const ast::VariableDeclarationStatement &statement ) -> ClassType::Member {
+            
+            if( statement.getInitializerExpression() )
+                throwRuntimeError( "Not implemented" );
+
             ClassType::Member member;
             member.identifier = statement.getIdentifier();
             member.type = valueTypeByAstType( statement.getType() );
-            if( statement.getInitializerExpression() )
-                throwRuntimeError( "Not implemented" );
             return member;
         });
 
@@ -74,26 +76,23 @@ void CodeGenerator::generate( const ast::Function &function, llvm::Module *modul
             return valueTypeByAstType( argument.type );
         });
 
-    ValueTypePointer functionType;
+    ValueTypePointer returnType =
+        function.getReturnType() ? valueTypeByAstType(function.getReturnType()) : nullptr;
 
-    if( function.getReturnType() )
-        functionType = std::make_shared<FunctionType>(
-            argumentTypes, CodeGenerator::valueTypeByAstType(function.getReturnType()) );
-    else
-        functionType = std::make_shared<FunctionType>( argumentTypes );
+    ValueTypePointer functionType = std::make_shared<FunctionType>( argumentTypes, returnType );
 
-    _llvmFunction = llvm::Function::Create(
+    llvm::Function *llvmFunction = llvm::Function::Create(
         static_cast<llvm::FunctionType*>(functionType->toLlvm()), llvm::Function::ExternalLinkage, function.getIdentifier(), module );
 
-    ValuePointer functionValue = Value::createSsaValue( functionType, _llvmFunction );
+    ValuePointer functionValue = Value::createSsaValue( functionType, llvmFunction );
 
     _symbolTable.addValue( function.getIdentifier(), functionValue );
 
     _symbolTable.enterLexicalScope();
 
-    for( llvm::Function::arg_iterator it = _llvmFunction->arg_begin(); it != _llvmFunction->arg_end(); ++it ) {
+    for( llvm::Function::arg_iterator it = llvmFunction->arg_begin(); it != llvmFunction->arg_end(); ++it ) {
         
-        size_t index = std::distance( _llvmFunction->arg_begin(), it );
+        size_t index = std::distance( llvmFunction->arg_begin(), it );
 
         llvm::Value *value = it;
         value->setName( arguments[index].identifier );
@@ -102,16 +101,9 @@ void CodeGenerator::generate( const ast::Function &function, llvm::Module *modul
             Value::createSsaValue(argumentTypes[index], value) );
     }
 
-    generate( function.getBlockStatement() );
+    generate( function.getBlockStatement(), llvm::BasicBlock::Create(globalLLVMContext, "entry", llvmFunction) );
 
     _symbolTable.leaveLexicalScope();
-}
-
-void CodeGenerator::generate( const ast::BlockStatement &blockStatement ) {
-
-    llvm::BasicBlock *basicBlock = insertBasicBlock( "entry" );
-
-    generate( blockStatement, basicBlock );
 }
 
 void CodeGenerator::generate( const ast::BlockStatement &blockStatement, llvm::BasicBlock *basicBlock ) {
@@ -125,7 +117,6 @@ void CodeGenerator::generate( const ast::BlockStatement &blockStatement, llvm::B
 
     _symbolTable.leaveLexicalScope();
 }
-
 
 void CodeGenerator::generate( ast::StatementPointer statement ) {
 
@@ -292,7 +283,7 @@ ValuePointer CodeGenerator::generate( const ast::CallExpression &expression ) {
 }
 
 llvm::BasicBlock* CodeGenerator::insertBasicBlock( const std::string &name ) {
-    return llvm::BasicBlock::Create( globalLLVMContext, name, _llvmFunction );
+    return llvm::BasicBlock::Create( globalLLVMContext, name, irBuilder.GetInsertBlock()->getParent() );
 }
 
 ValueTypePointer CodeGenerator::valueTypeByAstType( ast::TypePointer astType ) {

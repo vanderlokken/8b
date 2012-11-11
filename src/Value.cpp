@@ -32,15 +32,11 @@ ValuePointer Value::createUnusableValue() {
 }
 
 ValuePointer Value::createIntegerConstant( int value ) {
-    return Value::createSsaValue(
-        IntegerType::get(),
-        llvm::ConstantInt::get(IntegerType::get()->toLlvm(), value) );
+    return Value::createSsaValue( IntegerType::get(), irBuilder.getInt32(value) );
 }
 
 ValuePointer Value::createBooleanConstant( bool value ) {
-    return Value::createSsaValue(
-        BooleanType::get(),
-        llvm::ConstantInt::get(BooleanType::get()->toLlvm(), value) );
+    return Value::createSsaValue( BooleanType::get(), irBuilder.getInt1(value) );
 }
 
 ValueTypePointer Value::getType() const {
@@ -221,7 +217,7 @@ ValueTypePointer BooleanType::get() {
 }
 
 BooleanType::BooleanType() {
-    _type = llvm::Type::getInt1Ty( globalLLVMContext );
+    _type = irBuilder.getInt1Ty();
 }
 
 ValuePointer BooleanType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {

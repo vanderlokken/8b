@@ -19,7 +19,6 @@ private:
     void generate( const ast::Function&, llvm::Module* );
 
     void generate( ast::StatementPointer );
-    void generate( const ast::BlockStatement& );
     void generate( const ast::BlockStatement&, llvm::BasicBlock* );
     void generate( const ast::ExpressionStatement& );
     void generate( const ast::IfStatement& );
@@ -40,7 +39,6 @@ private:
 
     ValueTypePointer valueTypeByAstType( ast::TypePointer );
 
-    llvm::Function *_llvmFunction;
     SymbolTable _symbolTable;
 };
 
