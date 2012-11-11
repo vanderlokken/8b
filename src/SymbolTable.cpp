@@ -4,25 +4,38 @@
 
 namespace _8b {
     
-void SymbolTable::pushLexicalScope() {
-    _scopes.push_front( std::map< std::string, ValuePointer >() );
+void SymbolTable::enterLexicalScope() {
+    _scopes.push_front( SymbolTable::LexicalScope() );
 }
 
-void SymbolTable::popLexicalScope() {
+void SymbolTable::leaveLexicalScope() {
     _scopes.pop_front();
 }
 
-void SymbolTable::addSymbol( const std::string &name, ValuePointer value ) {
-    (*_scopes.begin())[name] = value;
+void SymbolTable::addValue( const std::string &name, ValuePointer value ) {
+    (*_scopes.begin())._valueNames[name] = value;
 }
 
-ValuePointer SymbolTable::lookupSymbol( const std::string &name ) const {
+void SymbolTable::addType( const std::string &name, ValueTypePointer type ) {
+    (*_scopes.begin())._typeNames[name] = type;
+}
+
+ValuePointer SymbolTable::lookupValue( const std::string &name ) const {
     for( const auto &scope : _scopes ) {
-        auto it = scope.find( name );
-        if( it != scope.end() )
+        auto it = scope._valueNames.find( name );
+        if( it != scope._valueNames.end() )
             return it->second;
     }
     throwRuntimeError( "Undeclared identifier" );
+}
+
+ValueTypePointer SymbolTable::lookupType( const std::string &name ) const {
+    for( const auto &scope : _scopes ) {
+        auto it = scope._typeNames.find( name );
+        if( it != scope._typeNames.end() )
+            return it->second;
+    }
+    throwRuntimeError( "Undeclared type" );
 }
 
 }

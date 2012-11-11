@@ -11,14 +11,21 @@ namespace _8b {
 class SymbolTable {
 public:
 
-    void pushLexicalScope();
-    void popLexicalScope();
+    void enterLexicalScope();
+    void leaveLexicalScope();
 
-    void addSymbol( const std::string&, ValuePointer );
-    ValuePointer lookupSymbol( const std::string& ) const;
+    void addValue( const std::string&, ValuePointer );
+    void addType( const std::string&, ValueTypePointer );
+
+    ValuePointer lookupValue( const std::string& ) const;
+    ValueTypePointer lookupType( const std::string& ) const;
 
 private:
-    std::list< std::map<std::string, ValuePointer> > _scopes;
+    struct LexicalScope {
+        std::map<std::string, ValuePointer> _valueNames;
+        std::map<std::string, ValueTypePointer> _typeNames;
+    };
+    std::list< LexicalScope > _scopes;
 };
 
 }

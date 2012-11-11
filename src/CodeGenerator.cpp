@@ -22,13 +22,13 @@ std::shared_ptr<llvm::Module> CodeGenerator::generate( const ast::Module &module
     std::shared_ptr<llvm::Module> llvmModule = std::make_shared<llvm::Module>(
         "test_module", globalLLVMContext );
 
-    _symbolTable.pushLexicalScope();
+    _symbolTable.enterLexicalScope();
 
     for( auto &it : module.getFunctions() ) {
         generate( it, llvmModule.get() );
     }
 
-    _symbolTable.popLexicalScope();
+    _symbolTable.leaveLexicalScope();
 
     return llvmModule;
 }
@@ -60,9 +60,9 @@ void CodeGenerator::generate( const ast::Function &function, llvm::Module *modul
 
     ValuePointer functionValue = Value::createSsaValue( functionType, _llvmFunction );
 
-    _symbolTable.addSymbol( function.getIdentifier(), functionValue );
+    _symbolTable.addValue( function.getIdentifier(), functionValue );
 
-    _symbolTable.pushLexicalScope();
+    _symbolTable.enterLexicalScope();
 
     for( llvm::Function::arg_iterator it = _llvmFunction->arg_begin(); it != _llvmFunction->arg_end(); ++it ) {
         
@@ -71,13 +71,13 @@ void CodeGenerator::generate( const ast::Function &function, llvm::Module *modul
         llvm::Value *value = it;
         value->setName( arguments[index].identifier );
 
-        _symbolTable.addSymbol( arguments[index].identifier,
+        _symbolTable.addValue( arguments[index].identifier,
             Value::createSsaValue(argumentTypes[index], value) );
     }
 
     generate( function.getBlockStatement() );
 
-    _symbolTable.popLexicalScope();
+    _symbolTable.leaveLexicalScope();
 }
 
 void CodeGenerator::generate( const ast::BlockStatement &blockStatement ) {
@@ -91,12 +91,12 @@ void CodeGenerator::generate( const ast::BlockStatement &blockStatement, llvm::B
 
     irBuilder.SetInsertPoint( basicBlock );
 
-    _symbolTable.pushLexicalScope();
+    _symbolTable.enterLexicalScope();
 
     for( auto &it : blockStatement.getStatements() )
         generate( it );
 
-    _symbolTable.popLexicalScope();
+    _symbolTable.leaveLexicalScope();
 }
 
 
@@ -179,7 +179,7 @@ void CodeGenerator::generate( const ast::VariableDeclarationStatement &statement
             " neither type identifier nor initializer expression" );
     }
 
-    _symbolTable.addSymbol( identifier, variable );
+    _symbolTable.addValue( identifier, variable );
 
     return;
 }
@@ -221,7 +221,7 @@ ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
 }
 
 ValuePointer CodeGenerator::generate( const ast::IdentifierExpression &expression ) {
-    return _symbolTable.lookupSymbol( expression.getIdentifier() );
+    return _symbolTable.lookupValue( expression.getIdentifier() );
 }
 
 ValuePointer CodeGenerator::generate( const ast::MemberAccessExpression &expression ) {
