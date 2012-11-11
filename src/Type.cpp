@@ -13,8 +13,19 @@ TypePointer Type::parse( LexicalAnalyser &lexicalAnalyser ) {
         return std::make_shared<IntegerType>( lexicalAnalyser );
     else if( tokenType == Token::Keyword_Boolean )
         return std::make_shared<BooleanType>( lexicalAnalyser );
-    
+    else if( tokenType == Token::Identifier )
+        return std::make_shared<NamedType>( lexicalAnalyser );
+
     throwRuntimeError( "Unexpected token or not supported" );
+}
+
+NamedType::NamedType( LexicalAnalyser &lexicalAnalyser )
+    : _identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
+{
+}
+
+const std::string& NamedType::getIdentifier() const {
+    return _identifier;
 }
 
 IntegerType::IntegerType( LexicalAnalyser &lexicalAnalyser ) {

@@ -22,6 +22,17 @@ template<class T>
 class ConcreteType : public DerivedIdClass<Type, T> {};
 
 
+class NamedType : public ConcreteType<NamedType> {
+public:
+    NamedType( LexicalAnalyser& );
+
+    const std::string& getIdentifier() const;
+
+private:
+    std::string _identifier;
+};
+
+
 class IntegerType : public ConcreteType<IntegerType> {
 public:
     IntegerType( LexicalAnalyser& );

@@ -49,7 +49,7 @@ ValueTypePointer Value::getType() const {
 
 llvm::Value* Value::getLlvmValue() const {
 
-    if( llvm::AllocaInst::classof(_llvmValue) )
+    if( llvm::AllocaInst::classof(_llvmValue) || llvm::GetElementPtrInst::classof(_llvmValue) )
         return irBuilder.CreateLoad( _llvmValue );
     else
         return _llvmValue;
@@ -135,7 +135,8 @@ ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, Va
 
     if( operation == BinaryOperation::Assignment ) {
 
-        if( !llvm::AllocaInst::classof(first->getRawLlvmValue()) )
+        if( !llvm::AllocaInst::classof(first->getRawLlvmValue()) &&
+            !llvm::GetElementPtrInst::classof(first->getRawLlvmValue()) )
             throwRuntimeError( "An assignment to a temporary value is not possible" );
 
         irBuilder.CreateStore( integerOperand(second), first->getRawLlvmValue() );
@@ -309,6 +310,39 @@ ValuePointer FunctionType::generateCall( ValuePointer callee, const std::vector<
         return Value::createSsaValue( _resultType, llvmResultValue );
     else
         return Value::createUnusableValue();
+}
+
+
+ClassType::ClassType( const std::vector<ClassType::Member> &members )
+    : _members( members )
+{
+    std::vector< llvm::Type* > memberTypes( members.size() );
+    std::transform(
+        members.cbegin(),
+        members.cend(),
+        memberTypes.begin(),
+        []( const ClassType::Member &member ) -> llvm::Type* {
+            return member.type->toLlvm();
+        });
+    _type = llvm::StructType::create( memberTypes );
+}
+
+ValuePointer ClassType::generateMemberAccess( ValuePointer classInstance, const std::string &memberIdentifier ) const {
+    
+    auto memberIterator = std::find_if(
+        _members.cbegin(),
+        _members.cend(),
+        [&memberIdentifier]( const ClassType::Member &member ) -> bool {
+            return member.identifier == memberIdentifier;
+        });
+
+    if( memberIterator == _members.end() )
+        return ValueType::generateMemberAccess( classInstance, memberIdentifier );
+
+    const size_t memberIndex = std::distance( _members.begin(), memberIterator );
+
+    return Value::createSsaValue( memberIterator->type,
+        irBuilder.CreateStructGEP(classInstance->getRawLlvmValue(), memberIndex) );
 }
 
 }

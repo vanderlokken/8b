@@ -15,6 +15,7 @@ public:
     std::shared_ptr<llvm::Module> generate( const ast::Module &module );
 
 private:
+    void generate( const ast::Class& );
     void generate( const ast::Function&, llvm::Module* );
 
     void generate( ast::StatementPointer );
@@ -37,7 +38,7 @@ private:
 
     llvm::BasicBlock* insertBasicBlock( const std::string& );
 
-    static ValueTypePointer valueTypeByAstType( ast::TypePointer );
+    ValueTypePointer valueTypeByAstType( ast::TypePointer );
 
     llvm::Function *_llvmFunction;
     SymbolTable _symbolTable;

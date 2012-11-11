@@ -13,17 +13,17 @@ void SymbolTable::leaveLexicalScope() {
 }
 
 void SymbolTable::addValue( const std::string &name, ValuePointer value ) {
-    (*_scopes.begin())._valueNames[name] = value;
+    _scopes.begin()->_values[name] = value;
 }
 
 void SymbolTable::addType( const std::string &name, ValueTypePointer type ) {
-    (*_scopes.begin())._typeNames[name] = type;
+    _scopes.begin()->_types[name] = type;
 }
 
 ValuePointer SymbolTable::lookupValue( const std::string &name ) const {
     for( const auto &scope : _scopes ) {
-        auto it = scope._valueNames.find( name );
-        if( it != scope._valueNames.end() )
+        auto it = scope._values.find( name );
+        if( it != scope._values.end() )
             return it->second;
     }
     throwRuntimeError( "Undeclared identifier" );
@@ -31,8 +31,8 @@ ValuePointer SymbolTable::lookupValue( const std::string &name ) const {
 
 ValueTypePointer SymbolTable::lookupType( const std::string &name ) const {
     for( const auto &scope : _scopes ) {
-        auto it = scope._typeNames.find( name );
-        if( it != scope._typeNames.end() )
+        auto it = scope._types.find( name );
+        if( it != scope._types.end() )
             return it->second;
     }
     throwRuntimeError( "Undeclared type" );

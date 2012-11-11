@@ -22,8 +22,8 @@ public:
 
 private:
     struct LexicalScope {
-        std::map<std::string, ValuePointer> _valueNames;
-        std::map<std::string, ValueTypePointer> _typeNames;
+        std::map<std::string, ValuePointer> _values;
+        std::map<std::string, ValueTypePointer> _types;
     };
     std::list< LexicalScope > _scopes;
 };

@@ -103,4 +103,21 @@ private:
     ValueTypePointer _resultType;
 };
 
+
+class ClassType : public _ValueType<ClassType> {
+public:
+
+    struct Member {
+        std::string identifier;
+        ValueTypePointer type;
+    };
+
+    ClassType( const std::vector<Member>& );
+
+    ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+
+private:
+    std::vector<Member> _members;
+};
+
 }

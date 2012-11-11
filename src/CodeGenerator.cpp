@@ -24,13 +24,40 @@ std::shared_ptr<llvm::Module> CodeGenerator::generate( const ast::Module &module
 
     _symbolTable.enterLexicalScope();
 
-    for( auto &it : module.getFunctions() ) {
+    for( auto &it : module.getClasses() )
+        generate( it );
+
+    for( auto &it : module.getFunctions() )
         generate( it, llvmModule.get() );
-    }
 
     _symbolTable.leaveLexicalScope();
 
     return llvmModule;
+}
+
+void CodeGenerator::generate( const ast::Class &classDeclaration ) {
+
+    const std::vector<VariableDeclarationStatement> &memberDeclarations =
+        classDeclaration.getVariables();
+
+    std::vector<ClassType::Member> members( memberDeclarations.size() );
+
+    std::transform(
+        memberDeclarations.cbegin(),
+        memberDeclarations.cend(),
+        members.begin(),
+        [this]( const ast::VariableDeclarationStatement &statement ) -> ClassType::Member {
+            ClassType::Member member;
+            member.identifier = statement.getIdentifier();
+            member.type = valueTypeByAstType( statement.getType() );
+            if( statement.getInitializerExpression() )
+                throwRuntimeError( "Not implemented" );
+            return member;
+        });
+
+    ValueTypePointer type = std::make_shared<ClassType>( members );
+
+    _symbolTable.addType( classDeclaration.getIdentifier(), type );
 }
 
 void CodeGenerator::generate( const ast::Function &function, llvm::Module *module ) {
@@ -43,8 +70,8 @@ void CodeGenerator::generate( const ast::Function &function, llvm::Module *modul
         arguments.cbegin(),
         arguments.cend(),
         argumentTypes.begin(),
-        []( const ast::Function::Argument &argument ) -> ValueTypePointer {
-            return CodeGenerator::valueTypeByAstType( argument.type );
+        [this]( const ast::Function::Argument &argument ) -> ValueTypePointer {
+            return valueTypeByAstType( argument.type );
         });
 
     ValueTypePointer functionType;
@@ -257,7 +284,7 @@ ValuePointer CodeGenerator::generate( const ast::CallExpression &expression ) {
         expression.getArguments().cbegin(),
         expression.getArguments().cend(),
         arguments.begin(),
-        [&]( ast::ExpressionPointer expression ) -> ValuePointer {
+        [this]( ast::ExpressionPointer expression ) -> ValuePointer {
             return CodeGenerator::generate( expression );
         });
 
@@ -273,6 +300,9 @@ ValueTypePointer CodeGenerator::valueTypeByAstType( ast::TypePointer astType ) {
         return IntegerType::get();
     if( astType->instanceOf<ast::BooleanType>() )
         return BooleanType::get();
+    if( astType->instanceOf<ast::NamedType>() )
+        return _symbolTable.lookupType(
+            std::static_pointer_cast<ast::NamedType>(astType)->getIdentifier() );
 }
 
 }
