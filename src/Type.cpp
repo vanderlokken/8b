@@ -7,29 +7,29 @@ namespace ast{
 
 TypePointer Type::parse( LexicalAnalyser &lexicalAnalyser ) {
 
-    const Token::Type tokenType = lexicalAnalyser.getCurrentToken().getType();
+    const TokenType tokenType = lexicalAnalyser.getCurrentToken().type;
     
-    if( tokenType == Token::Keyword_Integer )
+    if( tokenType == TokenType::KeywordInteger )
         return std::make_shared<IntegerType>( lexicalAnalyser );
-    else if( tokenType == Token::Keyword_Boolean )
+    else if( tokenType == TokenType::KeywordBoolean )
         return std::make_shared<BooleanType>( lexicalAnalyser );
-    else if( tokenType == Token::Identifier )
+    else if( tokenType == TokenType::Identifier )
         return std::make_shared<NamedType>( lexicalAnalyser );
 
     throwRuntimeError( "Unexpected token or not supported" );
 }
 
 NamedType::NamedType( LexicalAnalyser &lexicalAnalyser )
-    : identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
+    : identifier( lexicalAnalyser.extractToken(TokenType::Identifier).lexem )
 {
 }
 
 IntegerType::IntegerType( LexicalAnalyser &lexicalAnalyser ) {
-    lexicalAnalyser.extractToken( Token::Keyword_Integer );
+    lexicalAnalyser.extractToken( TokenType::KeywordInteger );
 }
 
 BooleanType::BooleanType( LexicalAnalyser &lexicalAnalyser ) {
-    lexicalAnalyser.extractToken( Token::Keyword_Boolean );
+    lexicalAnalyser.extractToken( TokenType::KeywordBoolean );
 }
 
 }

@@ -92,7 +92,7 @@ struct CallExpression : public ExpressionType<CallExpression> {
 };
 
 
-int getLeftBindingPower( Token::Type );
+int getLeftBindingPower( TokenType );
 
 }
 }

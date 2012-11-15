@@ -4,6 +4,6 @@
 
 namespace _8b {
 
-void checkToken( const Token&, Token::Type );
+void checkToken( const Token&, TokenType );
 
 }

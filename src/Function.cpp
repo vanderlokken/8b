@@ -7,33 +7,33 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
     
     // Read "function" keyword
     
-    lexicalAnalyser.extractToken( Token::Keyword_Function );
+    lexicalAnalyser.extractToken( TokenType::KeywordFunction );
     
     // Read identifier
     
-    identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
+    identifier = lexicalAnalyser.extractToken( TokenType::Identifier ).lexem;
     
     // Read arguments
     
-    lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningParenthesis );
 
-    while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingParenthesis ) {
+    while( lexicalAnalyser.getCurrentToken().type != TokenType::PunctuatorClosingParenthesis ) {
 
         if( !arguments.empty() )
-            lexicalAnalyser.extractToken( Token::Punctuator_Comma );
+            lexicalAnalyser.extractToken( TokenType::PunctuatorComma );
         
         Argument argument = {
-            lexicalAnalyser.extractToken( Token::Identifier ).getLexem(),
+            lexicalAnalyser.extractToken( TokenType::Identifier ).lexem,
             Type::parse(lexicalAnalyser)
         };
         arguments.push_back( argument );
     }
 
-    lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorClosingParenthesis );
 
     // Read return type
 
-    if( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_OpeningBrace )
+    if( lexicalAnalyser.getCurrentToken().type != TokenType::PunctuatorOpeningBrace )
         returnType = Type::parse( lexicalAnalyser );
 
     // Read statement block

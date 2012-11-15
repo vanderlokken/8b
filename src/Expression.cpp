@@ -12,7 +12,7 @@ ExpressionPointer Expression::parse( LexicalAnalyser &lexicalAnalyser, int right
 
     ExpressionPointer expression = Expression::nullDenotation( lexicalAnalyser );
 
-    while( rightBindingPower < getLeftBindingPower(lexicalAnalyser.getCurrentToken().getType()) ) {
+    while( rightBindingPower < getLeftBindingPower(lexicalAnalyser.getCurrentToken().type) ) {
 
         expression = Expression::leftDenotation( lexicalAnalyser, expression );
     }
@@ -22,25 +22,25 @@ ExpressionPointer Expression::parse( LexicalAnalyser &lexicalAnalyser, int right
 
 ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser ) {
 
-    const Token::Type tokenType = lexicalAnalyser.getCurrentToken().getType();
+    const TokenType tokenType = lexicalAnalyser.getCurrentToken().type;
 
-    if( tokenType == Token::Keyword_Instance )
+    if( tokenType == TokenType::KeywordInstance )
         return std::make_shared<InstanceExpression>( lexicalAnalyser );
 
-    if( tokenType == Token::Identifier )
+    if( tokenType == TokenType::Identifier )
         return std::make_shared<IdentifierExpression>( lexicalAnalyser );
 
-    if( tokenType == Token::Constant_Integer )
+    if( tokenType == TokenType::ConstantInteger )
         return std::make_shared<IntegerConstantExpression>( lexicalAnalyser );
 
-    if( tokenType == Token::Punctuator_OpeningParenthesis ) {
-        lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
+    if( tokenType == TokenType::PunctuatorOpeningParenthesis ) {
+        lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningParenthesis );
         ExpressionPointer expression = Expression::parse( lexicalAnalyser );
-        lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
+        lexicalAnalyser.extractToken( TokenType::PunctuatorClosingParenthesis );
         return expression;
     }
 
-    if( tokenType == Token::Keyword_True || tokenType == Token::Keyword_False )
+    if( tokenType == TokenType::KeywordTrue || tokenType == TokenType::KeywordFalse )
         return std::make_shared<BooleanConstantExpression>( lexicalAnalyser );
 
     throwRuntimeError( "Unexpected token" );
@@ -49,33 +49,33 @@ ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser )
 ExpressionPointer Expression::leftDenotation( LexicalAnalyser &lexicalAnalyser, ExpressionPointer expression ) {
 
     struct UnaryOperatorParsingRule {
-        Token::Type tokenType;
+        TokenType tokenType;
         UnaryOperation operation;
     };
 
     struct BinaryOperatorParsingRule {
-        Token::Type tokenType;
+        TokenType tokenType;
         BinaryOperation operation;
     };
 
     static const UnaryOperatorParsingRule unaryOperatorParsingRules[] = {
-        {Token::Operator_Increment, UnaryOperation::Increment},
-        {Token::Operator_Decrement, UnaryOperation::Decrement}
+        {TokenType::OperatorIncrement, UnaryOperation::Increment},
+        {TokenType::OperatorDecrement, UnaryOperation::Decrement}
     };
 
     static const BinaryOperatorParsingRule binaryOperatorParsingRules[] = {
-        {Token::Operator_Assign,   BinaryOperation::Assignment},
-        {Token::Operator_Plus,     BinaryOperation::Addition},
-        {Token::Operator_Minus,    BinaryOperation::Subtraction},
-        {Token::Operator_Multiply, BinaryOperation::Multiplication},
-        {Token::Operator_Divide,   BinaryOperation::Division},
-        {Token::Keyword_And,       BinaryOperation::LogicAnd},
-        {Token::Keyword_Or,        BinaryOperation::LogicOr},
-        {Token::Operator_Less,     BinaryOperation::LessComparison},
-        {Token::Operator_Greater,  BinaryOperation::GreaterComparison}
+        {TokenType::OperatorAssign,   BinaryOperation::Assignment},
+        {TokenType::OperatorPlus,     BinaryOperation::Addition},
+        {TokenType::OperatorMinus,    BinaryOperation::Subtraction},
+        {TokenType::OperatorMultiply, BinaryOperation::Multiplication},
+        {TokenType::OperatorDivide,   BinaryOperation::Division},
+        {TokenType::KeywordAnd,       BinaryOperation::LogicAnd},
+        {TokenType::KeywordOr,        BinaryOperation::LogicOr},
+        {TokenType::OperatorLess,     BinaryOperation::LessComparison},
+        {TokenType::OperatorGreater,  BinaryOperation::GreaterComparison}
     };
 
-    const Token::Type tokenType = lexicalAnalyser.getCurrentToken().getType();
+    const TokenType tokenType = lexicalAnalyser.getCurrentToken().type;
 
     for( auto &rule : binaryOperatorParsingRules ) {
         if( tokenType == rule.tokenType ) {
@@ -93,42 +93,42 @@ ExpressionPointer Expression::leftDenotation( LexicalAnalyser &lexicalAnalyser, 
         }
     }
 
-    if( tokenType == Token::Punctuator_OpeningParenthesis )
+    if( tokenType == TokenType::PunctuatorOpeningParenthesis )
         return std::make_shared<CallExpression>( lexicalAnalyser, expression );
 
-    if( tokenType == Token::Punctuator_Dot )
+    if( tokenType == TokenType::PunctuatorDot )
         return std::make_shared<MemberAccessExpression>( lexicalAnalyser, expression );
 
     return expression;
 }
 
 InstanceExpression::InstanceExpression( LexicalAnalyser &lexicalAnalyser ) {
-    lexicalAnalyser.extractToken( Token::Keyword_Instance );
+    lexicalAnalyser.extractToken( TokenType::KeywordInstance );
 }
 
 IdentifierExpression::IdentifierExpression( LexicalAnalyser &lexicalAnalyser )
-    : identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
+    : identifier( lexicalAnalyser.extractToken(TokenType::Identifier).lexem )
 {
 }
 
 MemberAccessExpression::MemberAccessExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer operand )
     : operand( operand )
 {
-    lexicalAnalyser.extractToken( Token::Punctuator_Dot );
-    memberIdentifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
+    lexicalAnalyser.extractToken( TokenType::PunctuatorDot );
+    memberIdentifier = lexicalAnalyser.extractToken( TokenType::Identifier ).lexem;
 }
 
 IntegerConstantExpression::IntegerConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
     std::stringstream stream;
-    stream << lexicalAnalyser.extractToken( Token::Constant_Integer ).getLexem();
+    stream << lexicalAnalyser.extractToken( TokenType::ConstantInteger ).lexem;
     stream >> value;
 }
 
 BooleanConstantExpression::BooleanConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
 
-    if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_True )
+    if( lexicalAnalyser.getCurrentToken().type == TokenType::KeywordTrue )
         value = true;
-    else if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_False )
+    else if( lexicalAnalyser.getCurrentToken().type == TokenType::KeywordFalse )
         value = false;
     else
         throwRuntimeError( "Unexpected token" );
@@ -154,59 +154,59 @@ UnaryOperationExpression::UnaryOperationExpression( UnaryOperation operation, Ex
 CallExpression::CallExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer callee )
     : callee( callee )
 {
-    lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningParenthesis );
 
-    while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingParenthesis ) {
+    while( lexicalAnalyser.getCurrentToken().type != TokenType::PunctuatorClosingParenthesis ) {
 
         if( !arguments.empty() )
-            lexicalAnalyser.extractToken( Token::Punctuator_Comma );
+            lexicalAnalyser.extractToken( TokenType::PunctuatorComma );
 
         arguments.push_back( Expression::parse(lexicalAnalyser) );
     }
 
-    lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorClosingParenthesis );
 }
 
 
-int getLeftBindingPower( Token::Type tokenType ) {
+int getLeftBindingPower( TokenType tokenType ) {
 
-    if( tokenType == Token::Operator_Assign )
+    if( tokenType == TokenType::OperatorAssign )
         return 5;
 
-    if( tokenType == Token::Keyword_And )
+    if( tokenType == TokenType::KeywordAnd )
         return 10;
 
-    if( tokenType == Token::Keyword_Or )
+    if( tokenType == TokenType::KeywordOr )
         return 10;
 
-    if( tokenType == Token::Operator_Less )
+    if( tokenType == TokenType::OperatorLess )
         return 15;
 
-    if( tokenType == Token::Operator_Greater )
+    if( tokenType == TokenType::OperatorGreater )
         return 15;
 
-    if( tokenType == Token::Operator_Plus )
+    if( tokenType == TokenType::OperatorPlus )
         return 20;
 
-    if( tokenType == Token::Operator_Minus )
+    if( tokenType == TokenType::OperatorMinus )
         return 20;
 
-    if( tokenType == Token::Operator_Multiply )
+    if( tokenType == TokenType::OperatorMultiply )
         return 30;
 
-    if( tokenType == Token::Operator_Divide )
+    if( tokenType == TokenType::OperatorDivide )
         return 30;
 
-    if( tokenType == Token::Operator_Increment )
+    if( tokenType == TokenType::OperatorIncrement )
         return 40;
 
-    if( tokenType == Token::Operator_Decrement )
+    if( tokenType == TokenType::OperatorDecrement )
         return 40;
 
-    if( tokenType == Token::Punctuator_OpeningParenthesis )
+    if( tokenType == TokenType::PunctuatorOpeningParenthesis )
         return 50;
 
-    if( tokenType == Token::Punctuator_Dot )
+    if( tokenType == TokenType::PunctuatorDot )
         return 60;
 
     return 0;

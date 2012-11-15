@@ -5,20 +5,20 @@ namespace ast{
 
 Class::Class( LexicalAnalyser &lexicalAnalyser ) {
 
-    lexicalAnalyser.extractToken( Token::Keyword_Class );
+    lexicalAnalyser.extractToken( TokenType::KeywordClass );
 
-    identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
+    identifier = lexicalAnalyser.extractToken( TokenType::Identifier ).lexem;
 
-    lexicalAnalyser.extractToken( Token::Punctuator_OpeningBrace );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningBrace );
 
-    while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingBrace ) {
-        if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_Variable )
+    while( lexicalAnalyser.getCurrentToken().type != TokenType::PunctuatorClosingBrace ) {
+        if( lexicalAnalyser.getCurrentToken().type == TokenType::KeywordVariable )
             variables.push_back( VariableDeclarationStatement(lexicalAnalyser) );
-        else if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_Function )
+        else if( lexicalAnalyser.getCurrentToken().type == TokenType::KeywordFunction )
             methods.push_back( Function(lexicalAnalyser) );
     }
 
-    lexicalAnalyser.extractToken( Token::Punctuator_ClosingBrace );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorClosingBrace );
 }
 
 }

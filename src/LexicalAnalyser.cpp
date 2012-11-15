@@ -34,7 +34,7 @@ Token LexicalAnalyser::extractToken() {
     return result;
 }
 
-Token LexicalAnalyser::extractToken( Token::Type tokenType ) {
+Token LexicalAnalyser::extractToken( TokenType tokenType ) {
     checkToken( getCurrentToken(), tokenType );
     return extractToken();
 }
@@ -43,52 +43,52 @@ Token LexicalAnalyser::readToken() {
 
     struct Rule {
         std::regex regex;
-        Token::Type tokenType;
+        TokenType tokenType;
         bool storeLexem;
     };
 
     static const Rule rules[] = {
-        { std::regex("\\s+"), Token::Whitespace, false },
-        { std::regex("and(?![_0-9a-zA-Z])"), Token::Keyword_And, false },
-        { std::regex("boolean(?![_0-9a-zA-Z])"), Token::Keyword_Boolean, false },
-        { std::regex("class(?![_0-9a-zA-Z])"), Token::Keyword_Class, false },
-        { std::regex("constant(?![_0-9a-zA-Z])"), Token::Keyword_Constant, false },
-        { std::regex("if(?![_0-9a-zA-Z])"), Token::Keyword_If, false },
-        { std::regex("in(?![_0-9a-zA-Z])"), Token::Keyword_In, false },
-        { std::regex("instance(?![_0-9a-zA-Z])"), Token::Keyword_Instance, false },
-        { std::regex("integer(?![_0-9a-zA-Z])"), Token::Keyword_Integer, false },
-        { std::regex("else(?![_0-9a-zA-Z])"), Token::Keyword_Else, false },
-        { std::regex("false(?![_0-9a-zA-Z])"), Token::Keyword_False, false },
-        { std::regex("for(?![_0-9a-zA-Z])"), Token::Keyword_For, false },
-        { std::regex("function(?![_0-9a-zA-Z])"), Token::Keyword_Function, false },
-        { std::regex("or(?![_0-9a-zA-Z])"), Token::Keyword_Or, false },
-        { std::regex("real(?![_0-9a-zA-Z])"), Token::Keyword_Real, false },
-        { std::regex("return(?![_0-9a-zA-Z])"), Token::Keyword_Return, false },
-        { std::regex("true(?![_0-9a-zA-Z])"), Token::Keyword_True, false },
-        { std::regex("variable(?![_0-9a-zA-Z])"), Token::Keyword_Variable, false },
-        { std::regex("while(?![_0-9a-zA-Z])"), Token::Keyword_While, false },
-        { std::regex("[_a-zA-Z][_0-9a-zA-Z]*"), Token::Identifier, true },        
-        { std::regex(";"), Token::Punctuator_Semicolon, false },
-        { std::regex(","), Token::Punctuator_Comma, false },
-        { std::regex("\\."), Token::Punctuator_Dot, false },
-        { std::regex("\\("), Token::Punctuator_OpeningParenthesis, false },
-        { std::regex("\\)"), Token::Punctuator_ClosingParenthesis, false },
-        { std::regex("\\{"), Token::Punctuator_OpeningBrace, false },
-        { std::regex("\\}"), Token::Punctuator_ClosingBrace, false },
-        { std::regex("<="), Token::Operator_LessOrEqual, false },
-        { std::regex(">="), Token::Operator_GreaterOrEqual, false },
-        { std::regex("=="), Token::Operator_Equal, false },
-        { std::regex("\\+\\+"), Token::Operator_Increment, false },
-        { std::regex("--"), Token::Operator_Decrement, false },
-        { std::regex("\\+"), Token::Operator_Plus, false },
-        { std::regex("-"), Token::Operator_Minus, false },
-        { std::regex("\\*"), Token::Operator_Multiply, false },
-        { std::regex("/"), Token::Operator_Divide, false },
-        { std::regex("="), Token::Operator_Assign, false },
-        { std::regex("<"), Token::Operator_Less, false },
-        { std::regex(">"), Token::Operator_Greater, false },
-        { std::regex("\\d+"), Token::Constant_Integer, true },
-        { std::regex("#.*"), Token::Comment, false }
+        { std::regex("\\s+"), TokenType::Whitespace, false },
+        { std::regex("and(?![_0-9a-zA-Z])"), TokenType::KeywordAnd, false },
+        { std::regex("boolean(?![_0-9a-zA-Z])"), TokenType::KeywordBoolean, false },
+        { std::regex("class(?![_0-9a-zA-Z])"), TokenType::KeywordClass, false },
+        { std::regex("constant(?![_0-9a-zA-Z])"), TokenType::KeywordConstant, false },
+        { std::regex("if(?![_0-9a-zA-Z])"), TokenType::KeywordIf, false },
+        { std::regex("in(?![_0-9a-zA-Z])"), TokenType::KeywordIn, false },
+        { std::regex("instance(?![_0-9a-zA-Z])"), TokenType::KeywordInstance, false },
+        { std::regex("integer(?![_0-9a-zA-Z])"), TokenType::KeywordInteger, false },
+        { std::regex("else(?![_0-9a-zA-Z])"), TokenType::KeywordElse, false },
+        { std::regex("false(?![_0-9a-zA-Z])"), TokenType::KeywordFalse, false },
+        { std::regex("for(?![_0-9a-zA-Z])"), TokenType::KeywordFor, false },
+        { std::regex("function(?![_0-9a-zA-Z])"), TokenType::KeywordFunction, false },
+        { std::regex("or(?![_0-9a-zA-Z])"), TokenType::KeywordOr, false },
+        { std::regex("real(?![_0-9a-zA-Z])"), TokenType::KeywordReal, false },
+        { std::regex("return(?![_0-9a-zA-Z])"), TokenType::KeywordReturn, false },
+        { std::regex("true(?![_0-9a-zA-Z])"), TokenType::KeywordTrue, false },
+        { std::regex("variable(?![_0-9a-zA-Z])"), TokenType::KeywordVariable, false },
+        { std::regex("while(?![_0-9a-zA-Z])"), TokenType::KeywordWhile, false },
+        { std::regex("[_a-zA-Z][_0-9a-zA-Z]*"), TokenType::Identifier, true },        
+        { std::regex(";"), TokenType::PunctuatorSemicolon, false },
+        { std::regex(","), TokenType::PunctuatorComma, false },
+        { std::regex("\\."), TokenType::PunctuatorDot, false },
+        { std::regex("\\("), TokenType::PunctuatorOpeningParenthesis, false },
+        { std::regex("\\)"), TokenType::PunctuatorClosingParenthesis, false },
+        { std::regex("\\{"), TokenType::PunctuatorOpeningBrace, false },
+        { std::regex("\\}"), TokenType::PunctuatorClosingBrace, false },
+        { std::regex("<="), TokenType::OperatorLessOrEqual, false },
+        { std::regex(">="), TokenType::OperatorGreaterOrEqual, false },
+        { std::regex("=="), TokenType::OperatorEqual, false },
+        { std::regex("\\+\\+"), TokenType::OperatorIncrement, false },
+        { std::regex("--"), TokenType::OperatorDecrement, false },
+        { std::regex("\\+"), TokenType::OperatorPlus, false },
+        { std::regex("-"), TokenType::OperatorMinus, false },
+        { std::regex("\\*"), TokenType::OperatorMultiply, false },
+        { std::regex("/"), TokenType::OperatorDivide, false },
+        { std::regex("="), TokenType::OperatorAssign, false },
+        { std::regex("<"), TokenType::OperatorLess, false },
+        { std::regex(">"), TokenType::OperatorGreater, false },
+        { std::regex("\\d+"), TokenType::ConstantInteger, true },
+        { std::regex("#.*"), TokenType::Comment, false }
 	};
 
 	std::smatch matchResult;
@@ -99,7 +99,7 @@ Token LexicalAnalyser::readToken() {
             
             _first += matchResult.length();
             
-            if( rule.tokenType == Token::Whitespace || rule.tokenType == Token::Comment )
+            if( rule.tokenType == TokenType::Whitespace || rule.tokenType == TokenType::Comment )
                 return readToken();
 
             return Token( rule.tokenType, rule.storeLexem ? matchResult.str() : "" );
