@@ -9,16 +9,12 @@
 namespace _8b {
 namespace ast{
 
-class Module {
-public:
+struct Module {
+
     Module( LexicalAnalyser& );
 
-    const std::vector<Class>& getClasses() const;
-    const std::vector<Function>& getFunctions() const;
-    
-private:
-    std::vector<Class> _classes;
-    std::vector<Function> _functions;
+    std::vector<Class> classes;
+    std::vector<Function> functions;
 };
 
 }

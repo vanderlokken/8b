@@ -28,24 +28,17 @@ BlockStatement::BlockStatement( LexicalAnalyser &lexicalAnalyser ) {
     lexicalAnalyser.extractToken( Token::Punctuator_OpeningBrace );
 
     while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingBrace ) {
-        _statements.push_back( Statement::parse(lexicalAnalyser) );
+        statements.push_back( Statement::parse(lexicalAnalyser) );
     }
 
     lexicalAnalyser.extractToken( Token::Punctuator_ClosingBrace);
 }
 
-const std::vector<StatementPointer>& BlockStatement::getStatements() const {
-    return _statements;
-}
 
-
-ExpressionStatement::ExpressionStatement( LexicalAnalyser &lexicalAnalyser ) {
-    _expression = Expression::parse( lexicalAnalyser );
+ExpressionStatement::ExpressionStatement( LexicalAnalyser &lexicalAnalyser )
+    : expression( Expression::parse(lexicalAnalyser) )
+{
     lexicalAnalyser.extractToken( Token::Punctuator_Semicolon );
-}
-
-ExpressionPointer ExpressionStatement::getExpression() const {
-    return _expression;
 }
 
 
@@ -53,27 +46,15 @@ IfStatement::IfStatement( LexicalAnalyser &lexicalAnalyser ) {
 
     lexicalAnalyser.extractToken( Token::Keyword_If );
     lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
-    _conditionExpression = Expression::parse( lexicalAnalyser );
+    conditionExpression = Expression::parse( lexicalAnalyser );
     lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
-    _trueBlockStatement = BlockStatement( lexicalAnalyser );
+    trueBlockStatement = BlockStatement( lexicalAnalyser );
 
     if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_Else ) {
 
         lexicalAnalyser.extractToken();
-        _falseBlockStatement = BlockStatement( lexicalAnalyser );
+        falseBlockStatement = BlockStatement( lexicalAnalyser );
     }
-}
-
-ExpressionPointer IfStatement::getConditionExpression() const {
-    return _conditionExpression;
-}
-
-const BlockStatement& IfStatement::getTrueBlockStatement() const {
-    return _trueBlockStatement;
-}
-
-const BlockStatement& IfStatement::getFalseBlockStatement() const {
-    return _falseBlockStatement;
 }
 
 
@@ -82,13 +63,9 @@ ReturnStatement::ReturnStatement( LexicalAnalyser &lexicalAnalyser ) {
     lexicalAnalyser.extractToken( Token::Keyword_Return );
 
     if( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_Semicolon )
-        _expression = Expression::parse( lexicalAnalyser );
+        expression = Expression::parse( lexicalAnalyser );
 
     lexicalAnalyser.extractToken( Token::Punctuator_Semicolon );
-}
-
-ExpressionPointer ReturnStatement::getExpression() const {
-    return _expression;
 }
 
 
@@ -96,28 +73,16 @@ VariableDeclarationStatement::VariableDeclarationStatement( LexicalAnalyser &lex
 
     lexicalAnalyser.extractToken( Token::Keyword_Variable );
 
-    _identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
+    identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
 
     if( lexicalAnalyser.getCurrentToken().getType() == Token::Operator_Assign ) {
         lexicalAnalyser.extractToken( Token::Operator_Assign );
-        _initializerExpression = Expression::parse( lexicalAnalyser );
+        initializerExpression = Expression::parse( lexicalAnalyser );
     } else {
-        _type = Type::parse( lexicalAnalyser );
+        type = Type::parse( lexicalAnalyser );
     }
 
     lexicalAnalyser.extractToken( Token::Punctuator_Semicolon );
-}
-
-const std::string& VariableDeclarationStatement::getIdentifier() const {
-    return _identifier;
-}
-
-TypePointer VariableDeclarationStatement::getType() const {
-    return _type;
-}
-
-ExpressionPointer VariableDeclarationStatement::getInitializerExpression() const {
-    return _initializerExpression;
 }
 
 
@@ -125,17 +90,9 @@ WhileStatement::WhileStatement( LexicalAnalyser &lexicalAnalyser ) {
 
     lexicalAnalyser.extractToken( Token::Keyword_While );
     lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
-    _conditionExpression = Expression::parse( lexicalAnalyser );
+    conditionExpression = Expression::parse( lexicalAnalyser );
     lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
-    _blockStatement = BlockStatement( lexicalAnalyser );
-}
-
-ExpressionPointer WhileStatement::getConditionExpression() const {
-    return _conditionExpression;
-}
-
-const BlockStatement& WhileStatement::getBlockStatement() const {
-    return _blockStatement;
+    blockStatement = BlockStatement( lexicalAnalyser );
 }
 
 

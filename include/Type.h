@@ -9,38 +9,32 @@ namespace _8b {
 namespace ast{
 
 
-class Type;
+struct Type;
 typedef std::shared_ptr<Type> TypePointer;
 
 
-class Type : public BaseIdClass {
-public:
+struct Type : public BaseIdClass {
     static TypePointer parse( LexicalAnalyser& );
 };
 
 template<class T>
-class ConcreteType : public DerivedIdClass<Type, T> {};
+struct ConcreteType : public DerivedIdClass<Type, T> {};
 
 
-class NamedType : public ConcreteType<NamedType> {
-public:
+struct NamedType : public ConcreteType<NamedType> {
+    
     NamedType( LexicalAnalyser& );
 
-    const std::string& getIdentifier() const;
-
-private:
-    std::string _identifier;
+    std::string identifier;
 };
 
 
-class IntegerType : public ConcreteType<IntegerType> {
-public:
+struct IntegerType : public ConcreteType<IntegerType> {
     IntegerType( LexicalAnalyser& );
 };
 
 
-class BooleanType : public ConcreteType<BooleanType> {
-public:
+struct BooleanType : public ConcreteType<BooleanType> {
     BooleanType( LexicalAnalyser& );
 };
 

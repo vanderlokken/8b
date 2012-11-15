@@ -20,12 +20,8 @@ TypePointer Type::parse( LexicalAnalyser &lexicalAnalyser ) {
 }
 
 NamedType::NamedType( LexicalAnalyser &lexicalAnalyser )
-    : _identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
+    : identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
 {
-}
-
-const std::string& NamedType::getIdentifier() const {
-    return _identifier;
 }
 
 IntegerType::IntegerType( LexicalAnalyser &lexicalAnalyser ) {

@@ -107,115 +107,64 @@ InstanceExpression::InstanceExpression( LexicalAnalyser &lexicalAnalyser ) {
 }
 
 IdentifierExpression::IdentifierExpression( LexicalAnalyser &lexicalAnalyser )
-    : _identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
+    : identifier( lexicalAnalyser.extractToken(Token::Identifier).getLexem() )
 {
-}
-
-const std::string& IdentifierExpression::getIdentifier() const {
-    return _identifier;
 }
 
 MemberAccessExpression::MemberAccessExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer operand )
-    : _operand( operand )
+    : operand( operand )
 {
     lexicalAnalyser.extractToken( Token::Punctuator_Dot );
-    _identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
-}
-
-ExpressionPointer MemberAccessExpression::getOperand() const {
-    return _operand;
-}
-
-const std::string& MemberAccessExpression::getMemberIdentifier() const {
-    return _identifier;
+    memberIdentifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
 }
 
 IntegerConstantExpression::IntegerConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
     std::stringstream stream;
     stream << lexicalAnalyser.extractToken( Token::Constant_Integer ).getLexem();
-    stream >> _value;
-}
-
-int IntegerConstantExpression::getValue() const {
-    return _value;
+    stream >> value;
 }
 
 BooleanConstantExpression::BooleanConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
 
     if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_True )
-        _value = true;
+        value = true;
     else if( lexicalAnalyser.getCurrentToken().getType() == Token::Keyword_False )
-        _value = false;
+        value = false;
     else
         throwRuntimeError( "Unexpected token" );
 
     lexicalAnalyser.extractToken();
 }
 
-bool BooleanConstantExpression::getValue() const {
-    return _value;
-}
-
-
 BinaryOperationExpression::BinaryOperationExpression(
     BinaryOperation operation,
     ExpressionPointer leftOperand,
     ExpressionPointer rightOperand )
-      : _operation( operation ),
-        _leftOperand( leftOperand ),
-        _rightOperand( rightOperand )
+      : operation( operation ),
+        leftOperand( leftOperand ),
+        rightOperand( rightOperand )
 {
 }
-
-BinaryOperation BinaryOperationExpression::getOperation() const {
-    return _operation;
-}
-
-ExpressionPointer BinaryOperationExpression::getLeftOperand() const {
-    return _leftOperand;
-}
-
-ExpressionPointer BinaryOperationExpression::getRightOperand() const {
-    return _rightOperand;
-}
-
 
 UnaryOperationExpression::UnaryOperationExpression( UnaryOperation operation, ExpressionPointer operand )
-    : _operation( operation ), _operand( operand )
+    : operation( operation ), operand( operand )
 {
 }
 
-UnaryOperation UnaryOperationExpression::getOperation() const {
-    return _operation;
-}
-
-ExpressionPointer UnaryOperationExpression::getOperand() const {
-    return _operand;
-}
-
-
 CallExpression::CallExpression( LexicalAnalyser &lexicalAnalyser, ExpressionPointer callee )
-    : _callee( callee )
+    : callee( callee )
 {
     lexicalAnalyser.extractToken( Token::Punctuator_OpeningParenthesis );
 
     while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingParenthesis ) {
 
-        if( !_arguments.empty() )
+        if( !arguments.empty() )
             lexicalAnalyser.extractToken( Token::Punctuator_Comma );
 
-        _arguments.push_back( Expression::parse(lexicalAnalyser) );
+        arguments.push_back( Expression::parse(lexicalAnalyser) );
     }
 
     lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
-}
-
-ExpressionPointer CallExpression::getCallee() const {
-    return _callee;
-}
-
-const std::vector<ExpressionPointer>& CallExpression::getArguments() const {
-    return _arguments;
 }
 
 

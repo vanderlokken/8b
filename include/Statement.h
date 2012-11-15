@@ -11,93 +11,69 @@ namespace _8b {
 namespace ast{
 
 
-class Statement;
+struct Statement;
 typedef std::shared_ptr<Statement> StatementPointer;
 
 
-class Statement : public BaseIdClass {
-public:
+struct Statement : public BaseIdClass {
     static StatementPointer parse( LexicalAnalyser& );
 };
 
 template<class T>
-class StatementType : public DerivedIdClass<Statement, T> {};
+struct StatementType : public DerivedIdClass<Statement, T> {};
 
 
-class BlockStatement : public StatementType<BlockStatement> {
-public:
+struct BlockStatement : public StatementType<BlockStatement> {
+    
     BlockStatement() {};
     BlockStatement( LexicalAnalyser& );
 
-    const std::vector<StatementPointer>& getStatements() const;
-
-private:
-    std::vector<StatementPointer> _statements;
+    std::vector<StatementPointer> statements;
 };
 
 
-class ExpressionStatement : public StatementType<ExpressionStatement> {
-public:
+struct ExpressionStatement : public StatementType<ExpressionStatement> {
+    
     ExpressionStatement( LexicalAnalyser& );
 
-    ExpressionPointer getExpression() const;
-
-private:
-    ExpressionPointer _expression;
+    ExpressionPointer expression;
 };
 
 
-class IfStatement : public StatementType<IfStatement> {
-public:
+struct IfStatement : public StatementType<IfStatement> {
+    
     IfStatement( LexicalAnalyser& );
 
-    ExpressionPointer getConditionExpression() const;
-    const BlockStatement& getTrueBlockStatement() const;
-    const BlockStatement& getFalseBlockStatement() const;
-
-private:
-    ExpressionPointer _conditionExpression;
-    BlockStatement _trueBlockStatement;
-    BlockStatement _falseBlockStatement;
+    ExpressionPointer conditionExpression;
+    BlockStatement trueBlockStatement;
+    BlockStatement falseBlockStatement;
 };
 
 
-class ReturnStatement : public StatementType<ReturnStatement> {
-public:
+struct ReturnStatement : public StatementType<ReturnStatement> {
+
     ReturnStatement( LexicalAnalyser& );
 
-    ExpressionPointer getExpression() const;
-
-private:
-    ExpressionPointer _expression;
+    ExpressionPointer expression;
 };
 
 
-class VariableDeclarationStatement : public StatementType<VariableDeclarationStatement> {
-public:
+struct VariableDeclarationStatement : public StatementType<VariableDeclarationStatement> {
+
     VariableDeclarationStatement( LexicalAnalyser& );
 
-    const std::string& getIdentifier() const;
-    TypePointer getType() const;
-    ExpressionPointer getInitializerExpression() const;
-
-private:
-    std::string _identifier;
-    TypePointer _type;
-    ExpressionPointer _initializerExpression;
+    std::string identifier;
+    TypePointer type;
+    ExpressionPointer initializerExpression;
 };
 
 
-class WhileStatement : public StatementType<WhileStatement> {
-public:
+struct WhileStatement : public StatementType<WhileStatement> {
+
     WhileStatement( LexicalAnalyser& );
 
-    ExpressionPointer getConditionExpression() const;
-    const BlockStatement& getBlockStatement() const;
-
-private:
-    ExpressionPointer _conditionExpression;
-    BlockStatement _blockStatement;
+    ExpressionPointer conditionExpression;
+    BlockStatement blockStatement;
 };
 
 

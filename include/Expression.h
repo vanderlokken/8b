@@ -10,12 +10,11 @@
 namespace _8b {
 namespace ast {
 
-class Expression;
-typedef std::shared_ptr<Expression> ExpressionPointer;
+struct Expression;
+typedef std::shared_ptr<const Expression> ExpressionPointer;
 
 
-class Expression : public BaseIdClass {
-public:
+struct Expression : public BaseIdClass {
     static ExpressionPointer parse( LexicalAnalyser&, int rightBindingPower = 0 );
 
 protected:
@@ -24,101 +23,72 @@ protected:
 };
 
 template<class T>
-class ExpressionType : public DerivedIdClass<Expression, T> {};
+struct ExpressionType : public DerivedIdClass<Expression, T> {};
 
 
-class InstanceExpression : public ExpressionType<InstanceExpression> {
-public:
+struct InstanceExpression : public ExpressionType<InstanceExpression> {
     InstanceExpression( LexicalAnalyser& );
 };
 
 
-class IdentifierExpression : public ExpressionType<IdentifierExpression> {
-public:
+struct IdentifierExpression : public ExpressionType<IdentifierExpression> {
+    
     IdentifierExpression( LexicalAnalyser& );
 
-    const std::string& getIdentifier() const;
-
-private:
-    std::string _identifier;
+    std::string identifier;
 };
 
 
-class MemberAccessExpression : public ExpressionType<MemberAccessExpression> {
-public:
+struct MemberAccessExpression : public ExpressionType<MemberAccessExpression> {
+    
     MemberAccessExpression( LexicalAnalyser&, ExpressionPointer );
 
-    ExpressionPointer getOperand() const;
-    const std::string& getMemberIdentifier() const;
-
-private:
-    ExpressionPointer _operand;
-    std::string _identifier;
+    ExpressionPointer operand;
+    std::string memberIdentifier;
 };
 
 
-class IntegerConstantExpression : public ExpressionType<IntegerConstantExpression> {
-public:
+struct IntegerConstantExpression : public ExpressionType<IntegerConstantExpression> {
+    
     IntegerConstantExpression( LexicalAnalyser& );
 
-    int getValue() const;
-
-private:
-    int _value;
+    int value;
 };
 
 
-class BooleanConstantExpression : public ExpressionType<BooleanConstantExpression> {
-public:
+struct BooleanConstantExpression : public ExpressionType<BooleanConstantExpression> {
+    
     BooleanConstantExpression( LexicalAnalyser& );
 
-    bool getValue() const;
-
-private:
-    bool _value;
+    bool value;
 };
 
 
-class BinaryOperationExpression : public ExpressionType< BinaryOperationExpression > {
-public:
-
+struct BinaryOperationExpression : public ExpressionType< BinaryOperationExpression > {
+    
     BinaryOperationExpression( BinaryOperation, ExpressionPointer leftOperand, ExpressionPointer rightOperand );
 
-    BinaryOperation getOperation() const;
-    ExpressionPointer getLeftOperand() const;
-    ExpressionPointer getRightOperand() const;
-
-protected:
-    BinaryOperation _operation;
-    ExpressionPointer _leftOperand;
-    ExpressionPointer _rightOperand;
+    BinaryOperation operation;
+    ExpressionPointer leftOperand;
+    ExpressionPointer rightOperand;
 };
 
 
-class UnaryOperationExpression : public ExpressionType< UnaryOperationExpression > {
-public:
-
+struct UnaryOperationExpression : public ExpressionType< UnaryOperationExpression > {
+    
     UnaryOperationExpression( UnaryOperation, ExpressionPointer operand );
 
-    UnaryOperation getOperation() const;
-    ExpressionPointer getOperand() const;
-
-protected:
-    UnaryOperation _operation;
-    ExpressionPointer _operand;
+    UnaryOperation operation;
+    ExpressionPointer operand;
 };
 
 
-class CallExpression : public ExpressionType<CallExpression> {
-public:
+struct CallExpression : public ExpressionType<CallExpression> {
+    
     CallExpression( LexicalAnalyser&, ExpressionPointer callee );
 
-    ExpressionPointer getCallee() const;
-    const std::vector<ExpressionPointer>& getArguments() const;
-
-private:
-    ExpressionPointer _callee;
-    std::vector<ExpressionPointer> _arguments;
+    ExpressionPointer callee;
+    std::vector<ExpressionPointer> arguments;
 };
 
 

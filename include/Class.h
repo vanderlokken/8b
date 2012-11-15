@@ -9,18 +9,13 @@
 namespace _8b {
 namespace ast {
     
-class Class {
-public:
+struct Class {
+
     Class( LexicalAnalyser& );
 
-    const std::string& getIdentifier() const;
-    const std::vector<Function>& getMethods() const;
-    const std::vector<VariableDeclarationStatement>& getVariables() const;
-
-private:
-    std::string _identifier;
-    std::vector<Function> _methods;
-    std::vector<VariableDeclarationStatement> _variables;
+    std::string identifier;
+    std::vector<Function> methods;
+    std::vector<VariableDeclarationStatement> variables;
 };
 
 }

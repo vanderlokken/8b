@@ -11,7 +11,7 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
     
     // Read identifier
     
-    _identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
+    identifier = lexicalAnalyser.extractToken( Token::Identifier ).getLexem();
     
     // Read arguments
     
@@ -19,14 +19,14 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
 
     while( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_ClosingParenthesis ) {
 
-        if( !_arguments.empty() )
+        if( !arguments.empty() )
             lexicalAnalyser.extractToken( Token::Punctuator_Comma );
         
         Argument argument = {
             lexicalAnalyser.extractToken( Token::Identifier ).getLexem(),
             Type::parse(lexicalAnalyser)
         };
-        _arguments.push_back( argument );
+        arguments.push_back( argument );
     }
 
     lexicalAnalyser.extractToken( Token::Punctuator_ClosingParenthesis );
@@ -34,29 +34,13 @@ Function::Function( LexicalAnalyser &lexicalAnalyser ) {
     // Read return type
 
     if( lexicalAnalyser.getCurrentToken().getType() != Token::Punctuator_OpeningBrace )
-        _returnType = Type::parse( lexicalAnalyser );
+        returnType = Type::parse( lexicalAnalyser );
 
     // Read statement block
 
-    _blockStatement = BlockStatement( lexicalAnalyser );
+    blockStatement = BlockStatement( lexicalAnalyser );
     
     return;
-}
-
-const std::string& Function::getIdentifier() const noexcept {
-    return _identifier;
-}
-
-const std::vector<Function::Argument>& Function::getArguments() const noexcept {
-    return _arguments;
-}
-
-TypePointer Function::getReturnType() const {
-    return _returnType;
-}
-
-const BlockStatement& Function::getBlockStatement() const {
-    return _blockStatement;
 }
 
 }

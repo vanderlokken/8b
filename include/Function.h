@@ -9,9 +9,8 @@
 namespace _8b {
 namespace ast{
 
-class Function {
-public:
-
+struct Function {
+    
     struct Argument {
         std::string identifier;
         TypePointer type;
@@ -19,16 +18,10 @@ public:
     
     Function( LexicalAnalyser& );
     
-    const std::string& getIdentifier() const noexcept;
-    const std::vector<Argument>& getArguments() const noexcept;
-    TypePointer getReturnType() const noexcept;
-    const BlockStatement& getBlockStatement() const;
-    
-private:
-    std::string _identifier;
-    std::vector<Argument> _arguments;
-    TypePointer _returnType;
-    BlockStatement _blockStatement;
+    std::string identifier;
+    std::vector<Argument> arguments;
+    TypePointer returnType;
+    BlockStatement blockStatement;
 };
 
 }
