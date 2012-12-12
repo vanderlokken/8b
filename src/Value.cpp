@@ -17,11 +17,15 @@ extern llvm::IRBuilder<> irBuilder;
 ValuePointer Value::createVariable( ValueTypePointer type, const std::string &identifier ) {
     llvm::Value *llvmValue = irBuilder.CreateAlloca( type->toLlvm() );
     llvmValue->setName( identifier );
-    return std::make_shared<Value>( type, llvmValue );
+    return std::make_shared<Value>( type, llvmValue, true );
+}
+
+ValuePointer Value::createReference( ValueTypePointer type, llvm::Value *value ) {
+    return std::make_shared<Value>( type, value, true );
 }
 
 ValuePointer Value::createSsaValue( ValueTypePointer type, llvm::Value *value ) {
-    return std::make_shared<Value>( type, value );
+    return std::make_shared<Value>( type, value, false );
 }
 
 ValuePointer Value::createUnusableValue() {
@@ -43,16 +47,20 @@ ValueTypePointer Value::getType() const {
     return _type;
 }
 
-llvm::Value* Value::getLlvmValue() const {
+llvm::Value* Value::toLlvm() const {
 
-    if( llvm::AllocaInst::classof(_llvmValue) || llvm::GetElementPtrInst::classof(_llvmValue) )
+    if( _assignable )
         return irBuilder.CreateLoad( _llvmValue );
     else
         return _llvmValue;
 }
 
-llvm::Value* Value::getRawLlvmValue() const {
-    return _llvmValue;
+llvm::Value* Value::toLlvmPointer() const {
+    
+    if( _assignable )
+        return _llvmValue;
+    else
+        throwRuntimeError( "Cannot reference a temporary value" );
 }
 
 ValuePointer Value::generateBinaryOperation( BinaryOperation operation, ValuePointer rightOperand ) const {
@@ -97,6 +105,11 @@ ValuePointer ValueType::generateBinaryOperation( BinaryOperation operation, Valu
 }
 
 ValuePointer ValueType::generateUnaryOperation( UnaryOperation operation, ValuePointer operand ) const {
+
+    if( operation == UnaryOperation::Addressing )
+        return Value::createSsaValue(
+            std::make_shared<PointerType>(operand->getType()), operand->toLlvmPointer() );
+
     throwRuntimeError( "This type doesn't implement specified operation" );
     return 0;
 }
@@ -130,39 +143,33 @@ IntegerType::IntegerType( int bitWidth ) {
 ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
 
     if( operation == BinaryOperation::Assignment ) {
-
-        if( !llvm::AllocaInst::classof(first->getRawLlvmValue()) &&
-            !llvm::GetElementPtrInst::classof(first->getRawLlvmValue()) )
-            throwRuntimeError( "An assignment to a temporary value is not possible" );
-
-        irBuilder.CreateStore( integerOperand(second), first->getRawLlvmValue() );
-
+        irBuilder.CreateStore( integerOperand(second), first->toLlvmPointer() );
         return Value::createUnusableValue();
     }
 
     if( operation == BinaryOperation::Addition )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateAdd(first->getLlvmValue(), integerOperand(second)) );
+            irBuilder.CreateAdd(first->toLlvm(), integerOperand(second)) );
 
     if( operation == BinaryOperation::Subtraction )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateSub(first->getLlvmValue(), integerOperand(second)) );
+            irBuilder.CreateSub(first->toLlvm(), integerOperand(second)) );
 
     if( operation == BinaryOperation::Multiplication )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateMul(first->getLlvmValue(), integerOperand(second)) );
+            irBuilder.CreateMul(first->toLlvm(), integerOperand(second)) );
 
     if( operation == BinaryOperation::Division )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateSDiv(first->getLlvmValue(), integerOperand(second)) );
+            irBuilder.CreateSDiv(first->toLlvm(), integerOperand(second)) );
 
     if( operation == BinaryOperation::LessComparison )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateICmpSLT(first->getLlvmValue(), integerOperand(second)) );
+            irBuilder.CreateICmpSLT(first->toLlvm(), integerOperand(second)) );
 
     if( operation == BinaryOperation::GreaterComparison )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateICmpSGT(first->getLlvmValue(), integerOperand(second)) );
+            irBuilder.CreateICmpSGT(first->toLlvm(), integerOperand(second)) );
     
     return ValueType::generateBinaryOperation( operation, first, second );
 }
@@ -205,7 +212,7 @@ llvm::Value* IntegerType::integerOperand( ValuePointer operand ) {
     if( !operand->getType()->instanceOf<IntegerType>() )
         throwRuntimeError( "Not implemented or not supported" );
     
-    return operand->getLlvmValue();
+    return operand->toLlvm();
 }
 
 
@@ -223,22 +230,17 @@ BooleanType::BooleanType() {
 ValuePointer BooleanType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
 
     if( operation == BinaryOperation::Assignment ) {
-
-        if( !llvm::AllocaInst::classof(first->getRawLlvmValue()) )
-            throwRuntimeError( "An assignment to a temporary value is not possible" );
-
-        irBuilder.CreateStore( second->toBoolean()->getLlvmValue(), first->getRawLlvmValue() );
-
+        irBuilder.CreateStore( second->toBoolean()->toLlvm(), first->toLlvmPointer() );
         return Value::createUnusableValue();
     }
 
     if( operation == BinaryOperation::LogicOr )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateOr(first->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
+            irBuilder.CreateOr(first->toLlvm(), second->toBoolean()->toLlvm()) );
 
     if( operation == BinaryOperation::LogicAnd )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateAnd(first->getLlvmValue(), second->toBoolean()->getLlvmValue()) );
+            irBuilder.CreateAnd(first->toLlvm(), second->toBoolean()->toLlvm()) );
 
     if( operation == BinaryOperation::Addition ||
         operation == BinaryOperation::Subtraction ||
@@ -260,11 +262,53 @@ ValuePointer BooleanType::generateUnaryOperation( UnaryOperation operation, Valu
 
     if( operation == UnaryOperation::IntegerConversion )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateZExt(operand->getLlvmValue(), IntegerType::get()->toLlvm()) );
+            irBuilder.CreateZExt(operand->toLlvm(), IntegerType::get()->toLlvm()) );
 
     return ValueType::generateUnaryOperation( operation, operand );
 }
 
+// PointerType
+
+PointerType::PointerType( ValueTypePointer targetType )
+    : _targetType( targetType )
+{
+    _type = llvm::PointerType::getUnqual( targetType->toLlvm() );
+}
+
+ValuePointer PointerType::generateUnaryOperation( UnaryOperation operation, ValuePointer operand ) const {
+
+    if( operation == UnaryOperation::BooleanConversion )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateIsNotNull(operand->toLlvm()) );
+
+    return ValueType::generateUnaryOperation( operation, operand );
+}
+
+ValuePointer PointerType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
+
+    if( operation == BinaryOperation::Assignment ) {
+        irBuilder.CreateStore( second->toLlvm(), first->toLlvmPointer() );
+        return Value::createUnusableValue();
+    }
+
+    if( operation == BinaryOperation::LessComparison )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateICmpSLT(first->toLlvm(), second->toLlvm()) );
+
+    if( operation == BinaryOperation::GreaterComparison )
+        return Value::createSsaValue( BooleanType::get(),
+            irBuilder.CreateICmpSGT(first->toLlvm(), second->toLlvm()) );
+    
+    return ValueType::generateBinaryOperation( operation, first, second );
+}
+
+ValuePointer PointerType::generateMemberAccess( ValuePointer operand, const std::string &memberIdentifier ) const {
+    
+    if( memberIdentifier == "target" )
+        return Value::createReference( _targetType, operand->toLlvm() );
+
+    return ValueType::generateMemberAccess( operand, memberIdentifier );
+}
 
 // FunctionType
 
@@ -297,10 +341,10 @@ ValuePointer FunctionType::generateCall( ValuePointer callee, const std::vector<
         arguments.cend(),
         llvmArguments.begin(),
         []( ValuePointer value ) -> llvm::Value* {
-            return value->getLlvmValue();
+            return value->toLlvm();
         });
 
-    llvm::Value *llvmResultValue = irBuilder.CreateCall( callee->getLlvmValue(), llvmArguments );
+    llvm::Value *llvmResultValue = irBuilder.CreateCall( callee->toLlvm(), llvmArguments );
 
     if( _resultType )
         return Value::createSsaValue( _resultType, llvmResultValue );
@@ -337,8 +381,8 @@ ValuePointer ClassType::generateMemberAccess( ValuePointer classInstance, const 
 
     const size_t memberIndex = std::distance( _members.begin(), memberIterator );
 
-    return Value::createSsaValue( memberIterator->type,
-        irBuilder.CreateStructGEP(classInstance->getRawLlvmValue(), memberIndex) );
+    return Value::createReference( memberIterator->type,
+        irBuilder.CreateStructGEP(classInstance->toLlvmPointer(), memberIndex) );
 }
 
 }

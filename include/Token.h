@@ -24,6 +24,8 @@ enum class TokenType {
     KeywordFor,
     KeywordFunction,
     KeywordOr,
+    KeywordPointer,
+    KeywordPointerTo,
     KeywordReal,
     KeywordReturn,
     KeywordTrue,
@@ -49,7 +51,9 @@ enum class TokenType {
     PunctuatorOpeningParenthesis,
     PunctuatorClosingParenthesis,
     PunctuatorOpeningBrace,
-    PunctuatorClosingBrace
+    PunctuatorClosingBrace,
+    PunctuatorOpeningBracket,
+    PunctuatorClosingBracket
 };
 
 struct Token {

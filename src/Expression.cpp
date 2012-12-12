@@ -40,6 +40,14 @@ ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser )
         return expression;
     }
 
+    if( tokenType == TokenType::KeywordPointerTo ) {
+        lexicalAnalyser.extractToken( TokenType::KeywordPointerTo );
+        lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningParenthesis );
+        ExpressionPointer expression = Expression::parse( lexicalAnalyser );
+        lexicalAnalyser.extractToken( TokenType::PunctuatorClosingParenthesis );
+        return std::make_shared<UnaryOperationExpression>( UnaryOperation::Addressing, expression );
+    }
+
     if( tokenType == TokenType::KeywordTrue || tokenType == TokenType::KeywordFalse )
         return std::make_shared<BooleanConstantExpression>( lexicalAnalyser );
 

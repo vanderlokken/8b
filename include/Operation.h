@@ -8,7 +8,8 @@ enum class UnaryOperation {
     ArithmeticInversion,
     LogicInversion,
     BooleanConversion,
-    IntegerConversion
+    IntegerConversion,
+    Addressing
 };
 
 enum class BinaryOperation {

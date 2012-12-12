@@ -13,6 +13,8 @@ TypePointer Type::parse( LexicalAnalyser &lexicalAnalyser ) {
         return std::make_shared<IntegerType>( lexicalAnalyser );
     else if( tokenType == TokenType::KeywordBoolean )
         return std::make_shared<BooleanType>( lexicalAnalyser );
+    else if( tokenType == TokenType::KeywordPointer )
+        return std::make_shared<PointerType>( lexicalAnalyser );
     else if( tokenType == TokenType::Identifier )
         return std::make_shared<NamedType>( lexicalAnalyser );
 
@@ -30,6 +32,13 @@ IntegerType::IntegerType( LexicalAnalyser &lexicalAnalyser ) {
 
 BooleanType::BooleanType( LexicalAnalyser &lexicalAnalyser ) {
     lexicalAnalyser.extractToken( TokenType::KeywordBoolean );
+}
+
+PointerType::PointerType( LexicalAnalyser &lexicalAnalyser ) {
+    lexicalAnalyser.extractToken( TokenType::KeywordPointer );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningBracket );
+    targetType = Type::parse( lexicalAnalyser );
+    lexicalAnalyser.extractToken( TokenType::PunctuatorClosingBracket );
 }
 
 }

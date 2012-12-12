@@ -142,7 +142,7 @@ void CodeGenerator::generate( const ast::IfStatement &statement ) {
     llvm::BasicBlock *falseBlock = hasFalseBlock ? insertBasicBlock( "ifFalse" ) : 0;
     llvm::BasicBlock *nextCodeBlock = insertBasicBlock( "endif" );
 
-    llvm::Value *condition = generate( statement.conditionExpression )->toBoolean()->getLlvmValue();
+    llvm::Value *condition = generate( statement.conditionExpression )->toBoolean()->toLlvm();
 
     irBuilder.CreateCondBr(
         condition, trueBlock, hasFalseBlock ? falseBlock : nextCodeBlock );
@@ -162,7 +162,7 @@ void CodeGenerator::generate( const ast::ReturnStatement &statement ) {
     if( !statement.expression )
         irBuilder.CreateRetVoid();
     else
-        irBuilder.CreateRet( generate(statement.expression)->getLlvmValue() );
+        irBuilder.CreateRet( generate(statement.expression)->toLlvm() );
 }
 
 void CodeGenerator::generate( const ast::VariableDeclarationStatement &statement ) {
@@ -202,7 +202,7 @@ void CodeGenerator::generate( const ast::WhileStatement &statement ) {
     irBuilder.CreateBr( loopStart );
 
     irBuilder.SetInsertPoint( loopStart );
-    llvm::Value *condition = generate( statement.conditionExpression )->toBoolean()->getLlvmValue();
+    llvm::Value *condition = generate( statement.conditionExpression )->toBoolean()->toLlvm();
     irBuilder.CreateCondBr( condition, loopCode, loopEnd );
 
     irBuilder.SetInsertPoint( loopEnd );
@@ -279,6 +279,9 @@ ValueTypePointer CodeGenerator::valueTypeByAstType( ast::TypePointer astType ) {
         return IntegerType::get();
     if( astType->instanceOf<ast::BooleanType>() )
         return BooleanType::get();
+    if( astType->instanceOf<ast::PointerType>() )
+        return std::make_shared<PointerType>(valueTypeByAstType(
+            std::static_pointer_cast<const ast::PointerType>(astType)->targetType));
     if( astType->instanceOf<ast::NamedType>() )
         return _symbolTable.lookupType(
             std::static_pointer_cast<const ast::NamedType>(astType)->identifier );

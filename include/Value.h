@@ -22,16 +22,18 @@ class Value : public std::enable_shared_from_this<Value> {
 public:
 
     static ValuePointer createVariable( ValueTypePointer type, const std::string &identifier );
+    static ValuePointer createReference( ValueTypePointer type, llvm::Value* );
     static ValuePointer createSsaValue( ValueTypePointer type, llvm::Value* );
     static ValuePointer createUnusableValue();
     static ValuePointer createIntegerConstant( int );
     static ValuePointer createBooleanConstant( bool );
 
-    Value( ValueTypePointer type, llvm::Value *llvmValue ) : _type( type ), _llvmValue( llvmValue ) {}
+    Value( ValueTypePointer type, llvm::Value *llvmValue, bool assignable )
+        : _type( type ), _llvmValue( llvmValue ), _assignable( assignable ) {}
 
     ValueTypePointer getType() const;
-    llvm::Value* getLlvmValue() const;
-    llvm::Value* getRawLlvmValue() const;
+    llvm::Value* toLlvm() const;
+    llvm::Value* toLlvmPointer() const;
 
     ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer ) const;
     ValuePointer generateUnaryOperation( UnaryOperation ) const;
@@ -44,6 +46,7 @@ public:
 protected:
     ValueTypePointer _type;
     llvm::Value *_llvmValue;
+    bool _assignable;
 };
 
 
@@ -93,6 +96,19 @@ private:
 };
 
 
+class PointerType : public _ValueType<PointerType> {
+public:
+    PointerType( ValueTypePointer targetType );
+
+    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
+    ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
+    ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    
+private:
+    ValueTypePointer _targetType;
+};
+
+
 class FunctionType : public _ValueType<FunctionType> {
 public:
     FunctionType( const std::vector<ValueTypePointer>&, ValueTypePointer resultType = nullptr );
@@ -119,5 +135,6 @@ public:
 private:
     std::vector<Member> _members;
 };
+
 
 }

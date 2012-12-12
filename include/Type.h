@@ -39,5 +39,13 @@ struct BooleanType : public ConcreteType<BooleanType> {
 };
 
 
+struct PointerType : public ConcreteType<PointerType> {
+
+    PointerType( LexicalAnalyser& );
+
+    TypePointer targetType;
+};
+
+
 }
 }
