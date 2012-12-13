@@ -219,6 +219,7 @@ ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
     _8b_generate_expression( ast::MemberAccessExpression );
     _8b_generate_expression( ast::IntegerConstantExpression );
     _8b_generate_expression( ast::BooleanConstantExpression );
+    _8b_generate_expression( ast::StringConstantExpression );
     _8b_generate_expression( ast::UnaryOperationExpression );
     _8b_generate_expression( ast::BinaryOperationExpression );
     _8b_generate_expression( ast::CallExpression );
@@ -240,6 +241,10 @@ ValuePointer CodeGenerator::generate( const ast::IntegerConstantExpression &expr
 
 ValuePointer CodeGenerator::generate( const ast::BooleanConstantExpression &expression ) {
     return Value::createBooleanConstant( expression.value );
+}
+
+ValuePointer CodeGenerator::generate( const ast::StringConstantExpression &expression ) {
+    return Value::createStringConstant( expression.value );
 }
 
 ValuePointer CodeGenerator::generate( const ast::UnaryOperationExpression &expression ) {
@@ -279,6 +284,8 @@ ValueTypePointer CodeGenerator::valueTypeByAstType( ast::TypePointer astType ) {
         return IntegerType::get();
     if( astType->instanceOf<ast::BooleanType>() )
         return BooleanType::get();
+    if( astType->instanceOf<ast::StringType>() )
+        return StringType::get();
     if( astType->instanceOf<ast::PointerType>() )
         return std::make_shared<PointerType>(valueTypeByAstType(
             std::static_pointer_cast<const ast::PointerType>(astType)->targetType));

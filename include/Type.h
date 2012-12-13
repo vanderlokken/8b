@@ -47,5 +47,9 @@ struct PointerType : public ConcreteType<PointerType> {
 };
 
 
+struct StringType : public ConcreteType<StringType> {
+    StringType( LexicalAnalyser& );
+};
+
 }
 }

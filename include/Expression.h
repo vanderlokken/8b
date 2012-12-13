@@ -64,6 +64,14 @@ struct BooleanConstantExpression : public ExpressionType<BooleanConstantExpressi
 };
 
 
+struct StringConstantExpression : public ExpressionType<StringConstantExpression> {
+    
+    StringConstantExpression( LexicalAnalyser& );
+
+    std::string value;
+};
+
+
 struct BinaryOperationExpression : public ExpressionType< BinaryOperationExpression > {
     
     BinaryOperationExpression( BinaryOperation, ExpressionPointer leftOperand, ExpressionPointer rightOperand );

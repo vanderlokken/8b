@@ -33,6 +33,9 @@ ExpressionPointer Expression::nullDenotation( LexicalAnalyser &lexicalAnalyser )
     if( tokenType == TokenType::ConstantInteger )
         return std::make_shared<IntegerConstantExpression>( lexicalAnalyser );
 
+    if( tokenType == TokenType::ConstantString )
+        return std::make_shared<StringConstantExpression>( lexicalAnalyser );
+
     if( tokenType == TokenType::PunctuatorOpeningParenthesis ) {
         lexicalAnalyser.extractToken( TokenType::PunctuatorOpeningParenthesis );
         ExpressionPointer expression = Expression::parse( lexicalAnalyser );
@@ -142,6 +145,12 @@ BooleanConstantExpression::BooleanConstantExpression( LexicalAnalyser &lexicalAn
         throwRuntimeError( "Unexpected token" );
 
     lexicalAnalyser.extractToken();
+}
+
+StringConstantExpression::StringConstantExpression( LexicalAnalyser &lexicalAnalyser ) {
+    value = lexicalAnalyser.extractToken( TokenType::ConstantString ).lexem;
+    // Remove surrounding '"' symbols
+    value = value.substr( 1, value.size() - 2 );
 }
 
 BinaryOperationExpression::BinaryOperationExpression(

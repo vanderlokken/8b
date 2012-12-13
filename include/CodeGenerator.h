@@ -31,6 +31,7 @@ private:
     ValuePointer generate( const ast::MemberAccessExpression& );
     ValuePointer generate( const ast::IntegerConstantExpression& );
     ValuePointer generate( const ast::BooleanConstantExpression& );
+    ValuePointer generate( const ast::StringConstantExpression& );
     ValuePointer generate( const ast::UnaryOperationExpression& );
     ValuePointer generate( const ast::BinaryOperationExpression& );
     ValuePointer generate( const ast::CallExpression& );

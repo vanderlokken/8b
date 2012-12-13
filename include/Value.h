@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <llvm/Value.h>
@@ -27,6 +28,7 @@ public:
     static ValuePointer createUnusableValue();
     static ValuePointer createIntegerConstant( int );
     static ValuePointer createBooleanConstant( bool );
+    static ValuePointer createStringConstant( const std::string& );
 
     Value( ValueTypePointer type, llvm::Value *llvmValue, bool assignable )
         : _type( type ), _llvmValue( llvmValue ), _assignable( assignable ) {}
@@ -106,6 +108,17 @@ public:
     
 private:
     ValueTypePointer _targetType;
+};
+
+
+class StringType : public _ValueType<StringType> {
+public:
+    static ValueTypePointer get();
+    
+    ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    
+private:
+    StringType();
 };
 
 

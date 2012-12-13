@@ -66,6 +66,7 @@ Token LexicalAnalyser::readToken() {
         { std::regex("pointer(?![_0-9a-zA-Z])"), TokenType::KeywordPointer, false },
         { std::regex("real(?![_0-9a-zA-Z])"), TokenType::KeywordReal, false },
         { std::regex("return(?![_0-9a-zA-Z])"), TokenType::KeywordReturn, false },
+        { std::regex("string(?![_0-9a-zA-Z])"), TokenType::KeywordString, false },
         { std::regex("true(?![_0-9a-zA-Z])"), TokenType::KeywordTrue, false },
         { std::regex("variable(?![_0-9a-zA-Z])"), TokenType::KeywordVariable, false },
         { std::regex("while(?![_0-9a-zA-Z])"), TokenType::KeywordWhile, false },
@@ -92,6 +93,7 @@ Token LexicalAnalyser::readToken() {
         { std::regex("<"), TokenType::OperatorLess, false },
         { std::regex(">"), TokenType::OperatorGreater, false },
         { std::regex("\\d+"), TokenType::ConstantInteger, true },
+        { std::regex("\".*\""), TokenType::ConstantString, true },
         { std::regex("#.*"), TokenType::Comment, false }
 	};
 

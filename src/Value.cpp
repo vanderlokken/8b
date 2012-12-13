@@ -43,6 +43,10 @@ ValuePointer Value::createBooleanConstant( bool value ) {
     return Value::createSsaValue( BooleanType::get(), irBuilder.getInt1(value) );
 }
 
+ValuePointer Value::createStringConstant( const std::string &value ) {
+    return Value::createSsaValue( StringType::get(), irBuilder.CreateGlobalString(value) );
+}
+
 ValueTypePointer Value::getType() const {
     return _type;
 }
@@ -306,6 +310,27 @@ ValuePointer PointerType::generateMemberAccess( ValuePointer operand, const std:
     
     if( memberIdentifier == "target" )
         return Value::createReference( _targetType, operand->toLlvm() );
+
+    return ValueType::generateMemberAccess( operand, memberIdentifier );
+}
+
+// StringType
+
+ValueTypePointer StringType::get() {
+    static const ValueTypePointer instance( new StringType() );
+    return instance;
+}
+
+StringType::StringType() {
+    _type = irBuilder.getInt8PtrTy();
+}
+
+ValuePointer StringType::generateMemberAccess( ValuePointer operand, const std::string &memberIdentifier ) const {
+    
+    if( memberIdentifier == "data" )
+        return Value::createSsaValue(
+            std::make_shared<PointerType>(IntegerType::get()),
+            irBuilder.CreateStructGEP(operand->toLlvm(), 0) );
 
     return ValueType::generateMemberAccess( operand, memberIdentifier );
 }
