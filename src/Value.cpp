@@ -377,6 +377,14 @@ ValuePointer FunctionType::generateCall( ValuePointer callee, const std::vector<
         return Value::createUnusableValue();
 }
 
+void ClassType::Builder::addMember( const std::string &identifier, ValueTypePointer type ) {
+    ClassType::Member member = { identifier, type };
+    _members.push_back( member );
+}
+
+ValueTypePointer ClassType::Builder::build() {
+    return std::make_shared<ClassType>( _members );
+}
 
 ClassType::ClassType( const std::vector<ClassType::Member> &members )
     : _members( members )

@@ -141,6 +141,17 @@ public:
         ValueTypePointer type;
     };
 
+    class Builder {
+    public:
+        void addMember( const std::string &identifier, ValueTypePointer type );
+        void addMethod( const std::string &identifier, ValuePointer function );
+
+        ValueTypePointer build();
+
+    private:
+        std::vector<ClassType::Member> _members;
+    };
+
     ClassType( const std::vector<Member>& );
 
     ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;

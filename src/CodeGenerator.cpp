@@ -37,24 +37,16 @@ std::shared_ptr<llvm::Module> CodeGenerator::generate( const ast::Module &module
 
 void CodeGenerator::generate( const ast::Class &classDeclaration ) {
 
-    std::vector<ClassType::Member> members( classDeclaration.variables.size() );
+    ClassType::Builder builder;
 
-    std::transform(
-        classDeclaration.variables.cbegin(),
-        classDeclaration.variables.cend(),
-        members.begin(),
-        [this]( const ast::VariableDeclarationStatement &statement ) -> ClassType::Member {
-            
-            if( statement.initializerExpression )
-                throwRuntimeError( "Not implemented" );
+    for( const auto &variableDeclaration : classDeclaration.variableDeclarations ) {
+        if( variableDeclaration.initializerExpression )
+            throwRuntimeError( "Not implemented" );
+        builder.addMember(
+            variableDeclaration.identifier, valueTypeByAstType(variableDeclaration.type) );
+    }
 
-            ClassType::Member member;
-            member.identifier = statement.identifier;
-            member.type = valueTypeByAstType( statement.type );
-            return member;
-        });
-
-    ValueTypePointer type = std::make_shared<ClassType>( members );
+    ValueTypePointer type = builder.build();
 
     _symbolTable.addType( classDeclaration.identifier, type );
 }

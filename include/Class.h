@@ -15,7 +15,7 @@ struct Class {
 
     std::string identifier;
     std::vector<Function> methods;
-    std::vector<VariableDeclarationStatement> variables;
+    std::vector<VariableDeclarationStatement> variableDeclarations;
 };
 
 }
