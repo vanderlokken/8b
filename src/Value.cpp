@@ -29,7 +29,7 @@ ValuePointer Value::createSsaValue( ValueTypePointer type, llvm::Value *value ) 
 }
 
 ValuePointer Value::createUnusableValue() {
-    class UnusableType : public _ValueType<UnusableType> {};
+    class UnusableType : public ValueType {};
     static const ValueTypePointer type( new UnusableType() );
     static const ValuePointer value( Value::createSsaValue(type, nullptr) );
     return value;
@@ -128,6 +128,13 @@ ValuePointer ValueType::generateMemberAccess( ValuePointer, const std::string& )
     return 0;
 }
 
+bool ValueType::isIntegerSubset() const {
+    return false;
+}
+
+bool ValueType::isRealSubset() const {
+    return false;
+}
 
 // IntegerType
 
@@ -146,34 +153,39 @@ IntegerType::IntegerType( int bitWidth ) {
 
 ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
 
+    if( !second->getType()->isIntegerSubset() )
+        return ValueType::generateBinaryOperation( operation, first, second );
+
+    llvm::Value *secondValue = second->toInteger()->toLlvm();
+
     if( operation == BinaryOperation::Assignment ) {
-        irBuilder.CreateStore( integerOperand(second), first->toLlvmPointer() );
+        irBuilder.CreateStore( secondValue, first->toLlvmPointer() );
         return Value::createUnusableValue();
     }
 
     if( operation == BinaryOperation::Addition )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateAdd(first->toLlvm(), integerOperand(second)) );
+            irBuilder.CreateAdd(first->toLlvm(), secondValue) );
 
     if( operation == BinaryOperation::Subtraction )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateSub(first->toLlvm(), integerOperand(second)) );
+            irBuilder.CreateSub(first->toLlvm(), secondValue) );
 
     if( operation == BinaryOperation::Multiplication )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateMul(first->toLlvm(), integerOperand(second)) );
+            irBuilder.CreateMul(first->toLlvm(), secondValue) );
 
     if( operation == BinaryOperation::Division )
         return Value::createSsaValue( IntegerType::get(),
-            irBuilder.CreateSDiv(first->toLlvm(), integerOperand(second)) );
+            irBuilder.CreateSDiv(first->toLlvm(), secondValue) );
 
     if( operation == BinaryOperation::LessComparison )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateICmpSLT(first->toLlvm(), integerOperand(second)) );
+            irBuilder.CreateICmpSLT(first->toLlvm(), secondValue) );
 
     if( operation == BinaryOperation::GreaterComparison )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateICmpSGT(first->toLlvm(), integerOperand(second)) );
+            irBuilder.CreateICmpSGT(first->toLlvm(), secondValue) );
     
     return ValueType::generateBinaryOperation( operation, first, second );
 }
@@ -182,7 +194,7 @@ ValuePointer IntegerType::generateUnaryOperation( UnaryOperation operation, Valu
 
     if( operation == UnaryOperation::BooleanConversion )
         return Value::createSsaValue( BooleanType::get(),
-            irBuilder.CreateIsNotNull(integerOperand(operand)) );
+            irBuilder.CreateIsNotNull(operand->toLlvm()) );
 
     if( operation == UnaryOperation::IntegerConversion )
         return operand;
@@ -208,17 +220,13 @@ ValuePointer IntegerType::generateUnaryOperation( UnaryOperation operation, Valu
     return ValueType::generateUnaryOperation( operation, operand );
 }
 
-llvm::Value* IntegerType::integerOperand( ValuePointer operand ) {
-    
-    if( operand->getType()->instanceOf<BooleanType>() )
-        operand = operand->toInteger();
-    
-    if( !operand->getType()->instanceOf<IntegerType>() )
-        throwRuntimeError( "Not implemented or not supported" );
-    
-    return operand->toLlvm();
+bool IntegerType::isIntegerSubset() const {
+    return true;
 }
 
+bool IntegerType::isRealSubset() const {
+    return true;
+}
 
 // BooleanType
 
@@ -269,6 +277,14 @@ ValuePointer BooleanType::generateUnaryOperation( UnaryOperation operation, Valu
             irBuilder.CreateZExt(operand->toLlvm(), IntegerType::get()->toLlvm()) );
 
     return ValueType::generateUnaryOperation( operation, operand );
+}
+
+bool BooleanType::isIntegerSubset() const {
+    return true;
+}
+
+bool BooleanType::isRealSubset() const {
+    return true;
 }
 
 // PointerType

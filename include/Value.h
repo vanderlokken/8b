@@ -6,7 +6,6 @@
 
 #include <llvm/Value.h>
 
-#include "ClassId.h"
 #include "Operation.h"
 
 namespace _8b {
@@ -52,7 +51,7 @@ protected:
 };
 
 
-class ValueType : public BaseIdClass {
+class ValueType {
 public:
     virtual ~ValueType() {}
 
@@ -62,17 +61,16 @@ public:
     virtual ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
     virtual ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
     virtual ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    
+    virtual bool isIntegerSubset() const;
+    virtual bool isRealSubset() const;
 
 protected:
     llvm::Type *_type;
 };
 
 
-template<class T>
-class _ValueType : public DerivedIdClass<ValueType, T> {};
-
-
-class IntegerType : public _ValueType<IntegerType> {
+class IntegerType : public ValueType {
 public:
     static ValueTypePointer get( int bitWidth = 32 );
 
@@ -82,11 +80,12 @@ public:
 private:
     IntegerType( int bitWidth );
 
-    static llvm::Value* integerOperand( ValuePointer );
+    bool isIntegerSubset() const;
+    bool isRealSubset() const;
 };
 
 
-class BooleanType : public _ValueType<BooleanType> {
+class BooleanType : public ValueType {
 public:
     static ValueTypePointer get();
 
@@ -95,10 +94,13 @@ public:
 
 private:
     BooleanType();
+    
+    bool isIntegerSubset() const;
+    bool isRealSubset() const;
 };
 
 
-class PointerType : public _ValueType<PointerType> {
+class PointerType : public ValueType {
 public:
     PointerType( ValueTypePointer targetType );
 
@@ -111,7 +113,7 @@ private:
 };
 
 
-class StringType : public _ValueType<StringType> {
+class StringType : public ValueType {
 public:
     static ValueTypePointer get();
     
@@ -122,7 +124,7 @@ private:
 };
 
 
-class FunctionType : public _ValueType<FunctionType> {
+class FunctionType : public ValueType {
 public:
     FunctionType( const std::vector<ValueTypePointer>&, ValueTypePointer resultType = nullptr );
 
@@ -133,7 +135,7 @@ private:
 };
 
 
-class ClassType : public _ValueType<ClassType> {
+class ClassType : public ValueType {
 public:
 
     struct Member {
