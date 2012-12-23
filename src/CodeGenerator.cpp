@@ -1,289 +1,332 @@
 #include "CodeGenerator.h"
 
-#include <llvm/Constants.h>
-#include <llvm/DerivedTypes.h>
-#include <llvm/Function.h>
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
 #include <llvm/Support/IRBuilder.h>
-#include <llvm/Type.h>
 
 #include "Exception.h"
+#include "SymbolTable.h"
+#include "Value.h"
 
 namespace _8b {
 
+extern llvm::IRBuilder<> irBuilder( llvm::getGlobalContext() );
 
-extern llvm::LLVMContext &globalLLVMContext = llvm::getGlobalContext();
-extern llvm::IRBuilder<> irBuilder( globalLLVMContext );
+struct CodeGenerator : ast::NodeVisitor {
 
-
-std::shared_ptr<llvm::Module> CodeGenerator::generate( const ast::Module &module ) {
-
-    std::shared_ptr<llvm::Module> llvmModule = std::make_shared<llvm::Module>(
-        "test_module", globalLLVMContext );
-
-    _symbolTable.enterLexicalScope();
-
-    for( auto &it : module.classes )
-        generate( it );
-
-    for( auto &it : module.functions )
-        generate( it, llvmModule.get() );
-
-    _symbolTable.leaveLexicalScope();
-
-    return llvmModule;
-}
-
-void CodeGenerator::generate( const ast::Class &classDeclaration ) {
-
-    ClassType::Builder builder;
-
-    for( const auto &variableDeclaration : classDeclaration.variableDeclarations ) {
-        if( variableDeclaration.initializerExpression )
-            throwRuntimeError( "Not implemented" );
-        builder.addMember(
-            variableDeclaration.identifier, valueTypeByAstType(variableDeclaration.type) );
+    // This function runs an appropriate code generation routine for the
+    // specified ast::Node object and returns the result of the specified type
+    template< class ReturnType > ReturnType generate( ast::Node node ) {
+        return boost::any_cast< ReturnType >( node->acceptVisitor(this) );
     }
 
-    ValueTypePointer type = builder.build();
+    boost::any visit( ast::Module module ) {
 
-    _symbolTable.addType( classDeclaration.identifier, type );
-}
+        _currentModule = new llvm::Module( "module", irBuilder.getContext() );
 
-void CodeGenerator::generate( const ast::Function &function, llvm::Module *module ) {
+        LexicalScope lexicalScope( _symbolTable );
 
-    std::vector<ValueTypePointer> argumentTypes( function.arguments.size() );
-    
-    std::transform(
-        function.arguments.cbegin(),
-        function.arguments.cend(),
-        argumentTypes.begin(),
-        [this]( const ast::Function::Argument &argument ) -> ValueTypePointer {
-            return valueTypeByAstType( argument.type );
-        });
+        for( auto &declaration : module->classDeclarations )
+            declaration->acceptVisitor( this );
 
-    ValueTypePointer returnType =
-        function.returnType ? valueTypeByAstType(function.returnType) : nullptr;
+        for( auto &declaration : module->functionDeclarations )
+            declaration->acceptVisitor( this );
 
-    ValueTypePointer functionType = std::make_shared<FunctionType>( argumentTypes, returnType );
-
-    llvm::Function *llvmFunction = llvm::Function::Create(
-        static_cast<llvm::FunctionType*>(functionType->toLlvm()), llvm::Function::ExternalLinkage, function.identifier, module );
-
-    ValuePointer functionValue = Value::createSsaValue( functionType, llvmFunction );
-
-    _symbolTable.addValue( function.identifier, functionValue );
-
-    _symbolTable.enterLexicalScope();
-
-    for( llvm::Function::arg_iterator it = llvmFunction->arg_begin(); it != llvmFunction->arg_end(); ++it ) {
-        
-        size_t index = std::distance( llvmFunction->arg_begin(), it );
-
-        llvm::Value *value = it;
-        value->setName( function.arguments[index].identifier );
-
-        _symbolTable.addValue( function.arguments[index].identifier,
-            Value::createSsaValue(argumentTypes[index], value) );
+        return _currentModule;
     }
 
-    generate( function.blockStatement, llvm::BasicBlock::Create(globalLLVMContext, "entry", llvmFunction) );
+    boost::any visit( ast::ClassDeclaration classDeclaration ) {
 
-    _symbolTable.leaveLexicalScope();
-}
+        ClassType::Builder builder;
 
-void CodeGenerator::generate( const ast::BlockStatement &blockStatement, llvm::BasicBlock *basicBlock ) {
+        for( auto &declaration : classDeclaration->memberDeclarations ) {
 
-    irBuilder.SetInsertPoint( basicBlock );
+            if( declaration->initializer )
+                throwRuntimeError( "Not implemented" );
 
-    _symbolTable.enterLexicalScope();
+            builder.addMember(
+                declaration->identifier,
+                generate< ValueTypePointer >( declaration->type ) );
+        }
 
-    for( auto &it : blockStatement.statements )
-        generate( it );
+        _symbolTable.addType( classDeclaration->identifier, builder.build() );
 
-    _symbolTable.leaveLexicalScope();
-}
-
-void CodeGenerator::generate( ast::StatementPointer statement ) {
-
-#define _8b_generate_statement( TYPE )                                \
-    if( statement->instanceOf<TYPE>() ) {                             \
-        generate( *std::static_pointer_cast<const TYPE>(statement) ); \
-        return;                                                       \
+        return boost::any();
     }
 
-    _8b_generate_statement( ast::ExpressionStatement );
-    _8b_generate_statement( ast::IfStatement );
-    _8b_generate_statement( ast::ReturnStatement );
-    _8b_generate_statement( ast::WhileStatement );
-    _8b_generate_statement( ast::VariableDeclarationStatement );
-
-    throwRuntimeError( "Not implemented" );
-}
-
-void CodeGenerator::generate( const ast::ExpressionStatement &statement ) {
-    generate( statement.expression );
-}
-
-void CodeGenerator::generate( const ast::IfStatement &statement ) {
-
-    const bool hasFalseBlock = statement.falseBlockStatement.statements.empty();
-
-    llvm::BasicBlock *trueBlock = insertBasicBlock( "ifTrue" );
-    llvm::BasicBlock *falseBlock = hasFalseBlock ? insertBasicBlock( "ifFalse" ) : 0;
-    llvm::BasicBlock *nextCodeBlock = insertBasicBlock( "endif" );
-
-    llvm::Value *condition = generate( statement.conditionExpression )->toBoolean()->toLlvm();
-
-    irBuilder.CreateCondBr(
-        condition, trueBlock, hasFalseBlock ? falseBlock : nextCodeBlock );
-
-    generate( statement.trueBlockStatement, trueBlock );
-    irBuilder.CreateBr( nextCodeBlock );
-
-    if( hasFalseBlock ) {
-        generate( statement.falseBlockStatement, falseBlock );
-        irBuilder.CreateBr( nextCodeBlock );
+    boost::any visit( ast::FunctionArgument ) {
+        // This function is not used
+        return boost::any();
     }
 
-    irBuilder.SetInsertPoint( nextCodeBlock );
-}
+    ValueTypePointer generateFunctionType(
+        ast::FunctionDeclaration declaration )
+    {
 
-void CodeGenerator::generate( const ast::ReturnStatement &statement ) {
-    if( !statement.expression )
-        irBuilder.CreateRetVoid();
-    else
-        irBuilder.CreateRet( generate(statement.expression)->toLlvm() );
-}
+        FunctionType::Builder builder;
 
-void CodeGenerator::generate( const ast::VariableDeclarationStatement &statement ) {
+        for( auto &argument : declaration->arguments ) {
+            ValueTypePointer type =
+                generate< ValueTypePointer >( argument->type );
+            builder.addArgument( argument->identifier, type );
+        }
 
-    ValuePointer variable;
+        builder.setReturnType(
+            generate< ValueTypePointer >( declaration->returnType ) );
 
-    if( statement.type ) {
-
-        variable = Value::createVariable(
-            valueTypeByAstType(statement.type), statement.identifier );
-    
-    } else if( statement.initializerExpression ) {
-
-        ValuePointer initializerValue = generate( statement.initializerExpression );
-        variable = Value::createVariable( initializerValue->getType(), statement.identifier );
-        variable->generateBinaryOperation( BinaryOperation::Assignment, initializerValue );
-
-    } else {
-        throwRuntimeError( "A variable declaration statement doesn't contain"
-            " neither type identifier nor initializer expression" );
+        return builder.build();
     }
 
-    _symbolTable.addValue( statement.identifier, variable );
+    boost::any visit( ast::FunctionDeclaration declaration ) {
 
-    return;
-}
+        ValueTypePointer type = generateFunctionType( declaration );
 
-void CodeGenerator::generate( const ast::WhileStatement &statement ) {
+        _currentFunction = llvm::Function::Create(
+            static_cast<llvm::FunctionType*>(type->toLlvm()),
+            llvm::Function::ExternalLinkage, declaration->identifier,
+            _currentModule );
 
-    llvm::BasicBlock *loopStart = insertBasicBlock( "loopStart" );
-    llvm::BasicBlock *loopCode = insertBasicBlock( "loopCode" );
-    llvm::BasicBlock *loopEnd = insertBasicBlock( "loopEnd" );
+        _symbolTable.addValue( declaration->identifier,
+            Value::createSsaValue(type, _currentFunction) );
 
-    irBuilder.CreateBr( loopStart );
+        LexicalScope lexicalScope( _symbolTable );
 
-    generate( statement.blockStatement, loopCode );
-    irBuilder.CreateBr( loopStart );
+        // Add arguments to the symbol table
 
-    irBuilder.SetInsertPoint( loopStart );
-    llvm::Value *condition = generate( statement.conditionExpression )->toBoolean()->toLlvm();
-    irBuilder.CreateCondBr( condition, loopCode, loopEnd );
+        for( size_t i = 0; i < declaration->arguments.size(); ++i ) {
 
-    irBuilder.SetInsertPoint( loopEnd );
-}
+            // TODO: do not generate ValueTypePointer from ast::Type but use
+            // previously generated
 
-ValuePointer CodeGenerator::generate( ast::ExpressionPointer expression ) {
+            auto argument = _currentFunction->getArgumentList().begin();
+            std::advance( argument, i );
 
-#define _8b_generate_expression( TYPE )                                       \
-    if( expression->instanceOf<TYPE>() ) {                                    \
-        return generate( *std::static_pointer_cast<const TYPE>(expression) ); \
+            ValuePointer value = Value::createSsaValue(
+                generate< ValueTypePointer >( declaration->arguments[i]->type ),
+                argument );
+
+            _symbolTable.addValue(
+                declaration->arguments[i]->identifier, value );
+        }
+
+        declaration->block->acceptVisitor( this );
+
+        return _currentFunction;
     }
 
-    _8b_generate_expression( ast::IdentifierExpression );
-    _8b_generate_expression( ast::MemberAccessExpression );
-    _8b_generate_expression( ast::IntegerConstantExpression );
-    _8b_generate_expression( ast::BooleanConstantExpression );
-    _8b_generate_expression( ast::StringConstantExpression );
-    _8b_generate_expression( ast::UnaryOperationExpression );
-    _8b_generate_expression( ast::BinaryOperationExpression );
-    _8b_generate_expression( ast::CallExpression );
+    // ------------------------------------------------------------------------
+    //  Statements
+    // ------------------------------------------------------------------------
 
-    throwRuntimeError( "Not implemented" );
-}
+    boost::any visit( ast::Block block ) {
 
-ValuePointer CodeGenerator::generate( const ast::IdentifierExpression &expression ) {
-    return _symbolTable.lookupValue( expression.identifier );
-}
+        llvm::BasicBlock *basicBlock = createBasicBlock();
+        irBuilder.SetInsertPoint( basicBlock );
 
-ValuePointer CodeGenerator::generate( const ast::MemberAccessExpression &expression ) {
-    return generate( expression.operand )->generateMemberAccess( expression.memberIdentifier );
-}
+        LexicalScope lexicalScope( _symbolTable );
 
-ValuePointer CodeGenerator::generate( const ast::IntegerConstantExpression &expression ) {
-    return Value::createIntegerConstant( expression.value );
-}
+        for( auto &statement : block->statements )
+            statement->acceptVisitor( this );
 
-ValuePointer CodeGenerator::generate( const ast::BooleanConstantExpression &expression ) {
-    return Value::createBooleanConstant( expression.value );
-}
+        return basicBlock;
+    }
 
-ValuePointer CodeGenerator::generate( const ast::StringConstantExpression &expression ) {
-    return Value::createStringConstant( expression.value );
-}
+    boost::any visit( ast::IfStatement statement ) {
 
-ValuePointer CodeGenerator::generate( const ast::UnaryOperationExpression &expression ) {
-    ValuePointer operand = generate( expression.operand );
-    return operand->generateUnaryOperation( expression.operation );
-}
+        // For "if" statements without "false" blocks a parser creates empty
+        // dummy "false" blocks. So it's not neccessary to check whether a
+        // "false" block exists or not.
 
-ValuePointer CodeGenerator::generate( const ast::BinaryOperationExpression &expression ) {
-    ValuePointer leftValue = generate( expression.leftOperand );
-    ValuePointer rightValue = generate( expression.rightOperand );
-    return leftValue->generateBinaryOperation( expression.operation, rightValue );
-}
+        auto previous = irBuilder.GetInsertBlock();
+        auto trueBranch =
+            generate< llvm::BasicBlock* >( statement->trueBlock );
+        auto falseBranch =
+            generate< llvm::BasicBlock* >( statement->falseBlock );
+        auto end = createBasicBlock();
 
-ValuePointer CodeGenerator::generate( const ast::CallExpression &expression ) {
+        trueBranch->moveAfter( previous );
+        falseBranch->moveAfter( trueBranch );
+        end->moveAfter( falseBranch );
 
-    ValuePointer callee = generate( expression.callee );
+        irBuilder.SetInsertPoint( previous );
+        ValuePointer condition =
+            generate< ValuePointer >( statement->condition )->toBoolean();
+        irBuilder.CreateCondBr( condition->toLlvm(), trueBranch, falseBranch );
 
-    std::vector<ValuePointer> arguments( expression.arguments.size() );
+        irBuilder.SetInsertPoint( trueBranch );
+        irBuilder.CreateBr( end );
 
-    std::transform(
-        expression.arguments.cbegin(),
-        expression.arguments.cend(),
-        arguments.begin(),
-        [this]( ast::ExpressionPointer expression ) -> ValuePointer {
-            return CodeGenerator::generate( expression );
-        });
+        irBuilder.SetInsertPoint( falseBranch );
+        irBuilder.CreateBr( end );
 
-    return callee->generateCall( arguments );
-}
+        irBuilder.SetInsertPoint( end );
 
-llvm::BasicBlock* CodeGenerator::insertBasicBlock( const std::string &name ) {
-    return llvm::BasicBlock::Create( globalLLVMContext, name, irBuilder.GetInsertBlock()->getParent() );
-}
+        return boost::any();
+    }
 
-ValueTypePointer CodeGenerator::valueTypeByAstType( ast::TypePointer astType ) {
-    if( astType->instanceOf<ast::IntegerType>() )
-        return IntegerType::get();
-    if( astType->instanceOf<ast::BooleanType>() )
+    boost::any visit( ast::ReturnStatement statement ) {
+        if( statement->expression )
+            irBuilder.CreateRet(
+                generate< ValuePointer >( statement->expression )->toLlvm() );
+        else
+            irBuilder.CreateRetVoid();
+        return boost::any();
+    }
+
+    boost::any visit( ast::VariableDeclaration declaration ) {
+
+        ValuePointer variable;
+
+        if( declaration->type ) {
+
+            auto type = generate< ValueTypePointer >( declaration->type );
+            variable = Value::createVariable( type, declaration->identifier );
+
+        } else if( declaration->initializer ) {
+
+            ValuePointer initializerValue =
+                generate< ValuePointer >( declaration->initializer );
+            variable = Value::createVariable(
+                initializerValue->getType(), declaration->identifier );
+            variable->generateBinaryOperation(
+                BinaryOperation::Assignment, initializerValue );
+
+        } else {
+            throwRuntimeError(
+                "A variable declaration statement doesn't contain neither type "
+                "identifier nor initializer expression" );
+        }
+
+        _symbolTable.addValue( declaration->identifier, variable );
+
+        return boost::any();
+    }
+
+    boost::any visit( ast::WhileStatement statement ) {
+
+        auto previous = irBuilder.GetInsertBlock();
+        auto    start = createBasicBlock();
+        auto      end = createBasicBlock();
+        auto     loop = generate< llvm::BasicBlock* >( statement->block );
+
+        start->moveAfter( previous );
+        loop->moveAfter( start );
+        end->moveAfter( loop );
+
+        irBuilder.SetInsertPoint( previous );
+        irBuilder.CreateBr( start );
+
+        irBuilder.SetInsertPoint( start );
+        ValuePointer condition =
+            generate< ValuePointer >( statement->condition )->toBoolean();
+        irBuilder.CreateCondBr( condition->toLlvm(), loop, end );
+
+        irBuilder.SetInsertPoint( loop );
+        irBuilder.CreateBr( start );
+
+        irBuilder.SetInsertPoint( end );
+
+        return boost::any();
+    }
+
+    // ------------------------------------------------------------------------
+    //  Expressions
+    // ------------------------------------------------------------------------
+
+    boost::any visit( ast::BinaryOperationExpression expression ) {
+        auto leftValue = generate< ValuePointer >( expression->leftOperand );
+        auto rightValue = generate< ValuePointer >( expression->rightOperand );
+        return leftValue->generateBinaryOperation(
+            expression->operation, rightValue );
+    }
+
+    boost::any visit( ast::BooleanConstant constant ) {
+        return Value::createBooleanConstant( constant->value );
+    }
+
+    boost::any visit( ast::CallExpression expression ) {
+        auto value = generate< ValuePointer >( expression->callee );
+        std::vector< ValuePointer > arguments( expression->arguments.size() );
+        std::transform(
+            expression->arguments.cbegin(),
+            expression->arguments.cend(),
+            arguments.begin(),
+            [this]( ast::Expression expression ) -> ValuePointer {
+                return generate< ValuePointer >( expression );
+            }
+        );
+        return value->generateCall( arguments );
+    }
+
+    boost::any visit( ast::IdentifierExpression expression ) {
+        return _symbolTable.lookupValue( expression->identifier );
+    }
+
+    boost::any visit( ast::InstanceExpression ) {
+        throwRuntimeError( "Not implemented" );
+        return boost::any();
+    }
+
+    boost::any visit( ast::IntegerConstant constant ) {
+        return Value::createIntegerConstant( constant->value );
+    }
+
+    boost::any visit( ast::MemberAccessExpression expression ) {
+        auto value = generate< ValuePointer >( expression->object );
+        return value->generateMemberAccess(
+            expression->memberIdentifier );
+    }
+
+    boost::any visit( ast::StringConstant constant ) {
+        return Value::createStringConstant( constant->value );
+    }
+
+    boost::any visit( ast::UnaryOperationExpression expression ) {
+        auto value = generate< ValuePointer >( expression->operand );
+        return value->generateUnaryOperation( expression->operation );
+    }
+
+    // ------------------------------------------------------------------------
+    //  Types
+    // ------------------------------------------------------------------------
+
+    boost::any visit( ast::BooleanType ) {
         return BooleanType::get();
-    if( astType->instanceOf<ast::StringType>() )
+    }
+
+    boost::any visit( ast::IntegerType ) {
+        return IntegerType::get();
+    }
+
+    boost::any visit( ast::NamedType namedType ) {
+        return _symbolTable.lookupType( namedType->identifier );
+    }
+
+    boost::any visit( ast::PointerType pointerType ) {
+        auto type = std::make_shared< PointerType >(
+            generate< ValueTypePointer >( pointerType->targetType ) );
+        return std::static_pointer_cast< ValueType >( type );
+    }
+
+    boost::any visit( ast::StringType ) {
         return StringType::get();
-    if( astType->instanceOf<ast::PointerType>() )
-        return std::make_shared<PointerType>(valueTypeByAstType(
-            std::static_pointer_cast<const ast::PointerType>(astType)->targetType));
-    if( astType->instanceOf<ast::NamedType>() )
-        return _symbolTable.lookupType(
-            std::static_pointer_cast<const ast::NamedType>(astType)->identifier );
+    }
+
+    // ------------------------------------------------------------------------
+    //  Shortcuts
+    // ------------------------------------------------------------------------
+
+    llvm::BasicBlock* createBasicBlock() {
+        return llvm::BasicBlock::Create(
+            irBuilder.getContext(), "", _currentFunction );
+    }
+
+    SymbolTable _symbolTable;
+
+    llvm::Module *_currentModule;
+    llvm::Function *_currentFunction;
+};
+
+llvm::Module* generateCode( ast::Module module ) {
+    return CodeGenerator().generate< llvm::Module* >( module );
 }
 
 }

@@ -7,7 +7,7 @@
 #include <llvm/Support/TargetSelect.h>
 
 #include "LexicalAnalyser.h"
-#include "Module.h"
+#include "Parser.h"
 #include "CodeGenerator.h"
 
 using namespace _8b;
@@ -16,16 +16,15 @@ int main() {
     std::ifstream input( "G:/Users/Lokken/Desktop/test.8b", std::ios::binary );
 
     try {
-        LexicalAnalyser analyser( input );
-        ast::Module module( analyser );
-        CodeGenerator generator;
-        std::shared_ptr<llvm::Module> llvmModule = generator.generate( module );
+        LexicalAnalyser lexicalAnalyser( input );
+        ast::Module moduleAst = parse( lexicalAnalyser );
+        llvm::Module *module = generateCode( moduleAst );
 
-        llvmModule->dump();
+        module->dump();
 
         llvm::InitializeNativeTarget();
 
-        llvm::ExecutionEngine *executionEngine = llvm::ExecutionEngine::createJIT( llvmModule.get() );
+        llvm::ExecutionEngine *executionEngine = llvm::ExecutionEngine::createJIT( module );
         llvm::Function *main = executionEngine->FindFunctionNamed( "main" );
 
         std::vector<llvm::GenericValue> arguments;

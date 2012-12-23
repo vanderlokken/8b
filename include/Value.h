@@ -61,7 +61,7 @@ public:
     virtual ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
     virtual ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
     virtual ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
-    
+
     virtual bool isIntegerSubset() const;
     virtual bool isRealSubset() const;
 
@@ -94,7 +94,7 @@ public:
 
 private:
     BooleanType();
-    
+
     bool isIntegerSubset() const;
     bool isRealSubset() const;
 };
@@ -107,7 +107,7 @@ public:
     ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
     ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
     ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
-    
+
 private:
     ValueTypePointer _targetType;
 };
@@ -116,9 +116,9 @@ private:
 class StringType : public ValueType {
 public:
     static ValueTypePointer get();
-    
+
     ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
-    
+
 private:
     StringType();
 };
@@ -126,6 +126,20 @@ private:
 
 class FunctionType : public ValueType {
 public:
+
+    class Builder {
+    public:
+        void addArgument(
+            const std::string &identifier, ValueTypePointer type );
+        void setReturnType( ValueTypePointer type );
+
+        ValueTypePointer build() const;
+
+    private:
+        std::vector< ValueTypePointer > _argumentTypes;
+        ValueTypePointer _resultType;
+    };
+
     FunctionType( const std::vector<ValueTypePointer>&, ValueTypePointer resultType = nullptr );
 
     ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
@@ -148,7 +162,7 @@ public:
         void addMember( const std::string &identifier, ValueTypePointer type );
         void addMethod( const std::string &identifier, ValuePointer function );
 
-        ValueTypePointer build();
+        ValueTypePointer build() const;
 
     private:
         std::vector<ClassType::Member> _members;

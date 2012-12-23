@@ -9,7 +9,6 @@
 
 namespace _8b {
 
-extern llvm::LLVMContext &globalLLVMContext;
 extern llvm::IRBuilder<> irBuilder;
 
 // Value
@@ -60,7 +59,7 @@ llvm::Value* Value::toLlvm() const {
 }
 
 llvm::Value* Value::toLlvmPointer() const {
-    
+
     if( _assignable )
         return _llvmValue;
     else
@@ -148,7 +147,7 @@ ValueTypePointer IntegerType::get( int bitWidth ) {
 }
 
 IntegerType::IntegerType( int bitWidth ) {
-    _type = llvm::IntegerType::get( globalLLVMContext, bitWidth );
+    _type = irBuilder.getInt32Ty();
 }
 
 ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, ValuePointer first, ValuePointer second ) const {
@@ -186,7 +185,7 @@ ValuePointer IntegerType::generateBinaryOperation( BinaryOperation operation, Va
     if( operation == BinaryOperation::GreaterComparison )
         return Value::createSsaValue( BooleanType::get(),
             irBuilder.CreateICmpSGT(first->toLlvm(), secondValue) );
-    
+
     return ValueType::generateBinaryOperation( operation, first, second );
 }
 
@@ -318,12 +317,12 @@ ValuePointer PointerType::generateBinaryOperation( BinaryOperation operation, Va
     if( operation == BinaryOperation::GreaterComparison )
         return Value::createSsaValue( BooleanType::get(),
             irBuilder.CreateICmpSGT(first->toLlvm(), second->toLlvm()) );
-    
+
     return ValueType::generateBinaryOperation( operation, first, second );
 }
 
 ValuePointer PointerType::generateMemberAccess( ValuePointer operand, const std::string &memberIdentifier ) const {
-    
+
     if( memberIdentifier == "target" )
         return Value::createReference( _targetType, operand->toLlvm() );
 
@@ -342,7 +341,7 @@ StringType::StringType() {
 }
 
 ValuePointer StringType::generateMemberAccess( ValuePointer operand, const std::string &memberIdentifier ) const {
-    
+
     if( memberIdentifier == "data" )
         return Value::createSsaValue(
             std::make_shared<PointerType>(IntegerType::get()),
@@ -353,11 +352,25 @@ ValuePointer StringType::generateMemberAccess( ValuePointer operand, const std::
 
 // FunctionType
 
+void FunctionType::Builder::addArgument(
+    const std::string &identifier, ValueTypePointer type )
+{
+    _argumentTypes.push_back( type );
+}
+
+void FunctionType::Builder::setReturnType( ValueTypePointer type ) {
+    _resultType = type;
+}
+
+ValueTypePointer FunctionType::Builder::build() const {
+    return std::make_shared< FunctionType >( _argumentTypes, _resultType );
+}
+
 FunctionType::FunctionType( const std::vector<ValueTypePointer> &argumentTypes, ValueTypePointer resultType )
     : _resultType( resultType )
 {
     const bool isVariableArgument = false;
-    
+
     std::vector<llvm::Type*> llvmArgumentTypes( argumentTypes.size() );
 
     std::transform(
@@ -368,7 +381,7 @@ FunctionType::FunctionType( const std::vector<ValueTypePointer> &argumentTypes, 
             return type->toLlvm();
         });
 
-    llvm::Type *llvmResultType = _resultType ? _resultType->toLlvm() : llvm::Type::getVoidTy( globalLLVMContext );
+    llvm::Type *llvmResultType = _resultType ? _resultType->toLlvm() : irBuilder.getVoidTy();
 
     _type = llvm::FunctionType::get( llvmResultType, llvmArgumentTypes, isVariableArgument );
 }
@@ -393,12 +406,14 @@ ValuePointer FunctionType::generateCall( ValuePointer callee, const std::vector<
         return Value::createUnusableValue();
 }
 
+// ClassType
+
 void ClassType::Builder::addMember( const std::string &identifier, ValueTypePointer type ) {
     ClassType::Member member = { identifier, type };
     _members.push_back( member );
 }
 
-ValueTypePointer ClassType::Builder::build() {
+ValueTypePointer ClassType::Builder::build() const {
     return std::make_shared<ClassType>( _members );
 }
 
@@ -417,7 +432,7 @@ ClassType::ClassType( const std::vector<ClassType::Member> &members )
 }
 
 ValuePointer ClassType::generateMemberAccess( ValuePointer classInstance, const std::string &memberIdentifier ) const {
-    
+
     auto memberIterator = std::find_if(
         _members.cbegin(),
         _members.cend(),

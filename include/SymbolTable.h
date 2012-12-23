@@ -4,6 +4,8 @@
 #include <map>
 #include <string>
 
+#include <boost/noncopyable.hpp>
+
 #include "Value.h"
 
 namespace _8b {
@@ -26,6 +28,20 @@ private:
         std::map<std::string, ValueTypePointer> _types;
     };
     std::list< LexicalScope > _scopes;
+};
+
+class LexicalScope : boost::noncopyable {
+public:
+    LexicalScope( SymbolTable &symbolTable ) : _symbolTable( symbolTable ) {
+        _symbolTable.enterLexicalScope();
+    }
+
+    ~LexicalScope() {
+        _symbolTable.leaveLexicalScope();
+    }
+
+private:
+    SymbolTable &_symbolTable;
 };
 
 }
