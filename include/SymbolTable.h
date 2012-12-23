@@ -16,16 +16,16 @@ public:
     void enterLexicalScope();
     void leaveLexicalScope();
 
-    void addValue( const std::string&, ValuePointer );
-    void addType( const std::string&, ValueTypePointer );
+    void addValue( const std::string&, Value );
+    void addType( const std::string&, ValueType );
 
-    ValuePointer lookupValue( const std::string& ) const;
-    ValueTypePointer lookupType( const std::string& ) const;
+    Value lookupValue( const std::string& ) const;
+    ValueType lookupType( const std::string& ) const;
 
 private:
     struct LexicalScope {
-        std::map<std::string, ValuePointer> _values;
-        std::map<std::string, ValueTypePointer> _types;
+        std::map<std::string, Value> _values;
+        std::map<std::string, ValueType> _types;
     };
     std::list< LexicalScope > _scopes;
 };

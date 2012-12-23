@@ -44,7 +44,7 @@ struct CodeGenerator : ast::NodeVisitor {
 
             builder.addMember(
                 declaration->identifier,
-                generate< ValueTypePointer >( declaration->type ) );
+                generate< ValueType >( declaration->type ) );
         }
 
         _symbolTable.addType( classDeclaration->identifier, builder.build() );
@@ -57,27 +57,24 @@ struct CodeGenerator : ast::NodeVisitor {
         return boost::any();
     }
 
-    ValueTypePointer generateFunctionType(
-        ast::FunctionDeclaration declaration )
-    {
+    ValueType generateFunctionType( ast::FunctionDeclaration declaration ) {
 
         FunctionType::Builder builder;
 
         for( auto &argument : declaration->arguments ) {
-            ValueTypePointer type =
-                generate< ValueTypePointer >( argument->type );
+            ValueType type = generate< ValueType >( argument->type );
             builder.addArgument( argument->identifier, type );
         }
 
         builder.setReturnType(
-            generate< ValueTypePointer >( declaration->returnType ) );
+            generate< ValueType >( declaration->returnType ) );
 
         return builder.build();
     }
 
     boost::any visit( ast::FunctionDeclaration declaration ) {
 
-        ValueTypePointer type = generateFunctionType( declaration );
+        ValueType type = generateFunctionType( declaration );
 
         _currentFunction = llvm::Function::Create(
             static_cast<llvm::FunctionType*>(type->toLlvm()),
@@ -85,7 +82,7 @@ struct CodeGenerator : ast::NodeVisitor {
             _currentModule );
 
         _symbolTable.addValue( declaration->identifier,
-            Value::createSsaValue(type, _currentFunction) );
+            _Value::createSsaValue(type, _currentFunction) );
 
         LexicalScope lexicalScope( _symbolTable );
 
@@ -93,14 +90,14 @@ struct CodeGenerator : ast::NodeVisitor {
 
         for( size_t i = 0; i < declaration->arguments.size(); ++i ) {
 
-            // TODO: do not generate ValueTypePointer from ast::Type but use
+            // TODO: do not generate ValueType from ast::Type but use
             // previously generated
 
             auto argument = _currentFunction->getArgumentList().begin();
             std::advance( argument, i );
 
-            ValuePointer value = Value::createSsaValue(
-                generate< ValueTypePointer >( declaration->arguments[i]->type ),
+            Value value = _Value::createSsaValue(
+                generate< ValueType >( declaration->arguments[i]->type ),
                 argument );
 
             _symbolTable.addValue(
@@ -147,8 +144,8 @@ struct CodeGenerator : ast::NodeVisitor {
         end->moveAfter( falseBranch );
 
         irBuilder.SetInsertPoint( previous );
-        ValuePointer condition =
-            generate< ValuePointer >( statement->condition )->toBoolean();
+        Value condition =
+            generate< Value >( statement->condition )->toBoolean();
         irBuilder.CreateCondBr( condition->toLlvm(), trueBranch, falseBranch );
 
         irBuilder.SetInsertPoint( trueBranch );
@@ -165,7 +162,7 @@ struct CodeGenerator : ast::NodeVisitor {
     boost::any visit( ast::ReturnStatement statement ) {
         if( statement->expression )
             irBuilder.CreateRet(
-                generate< ValuePointer >( statement->expression )->toLlvm() );
+                generate< Value >( statement->expression )->toLlvm() );
         else
             irBuilder.CreateRetVoid();
         return boost::any();
@@ -173,18 +170,18 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::VariableDeclaration declaration ) {
 
-        ValuePointer variable;
+        Value variable;
 
         if( declaration->type ) {
 
-            auto type = generate< ValueTypePointer >( declaration->type );
-            variable = Value::createVariable( type, declaration->identifier );
+            auto type = generate< ValueType >( declaration->type );
+            variable = _Value::createVariable( type, declaration->identifier );
 
         } else if( declaration->initializer ) {
 
-            ValuePointer initializerValue =
-                generate< ValuePointer >( declaration->initializer );
-            variable = Value::createVariable(
+            Value initializerValue =
+                generate< Value >( declaration->initializer );
+            variable = _Value::createVariable(
                 initializerValue->getType(), declaration->identifier );
             variable->generateBinaryOperation(
                 BinaryOperation::Assignment, initializerValue );
@@ -215,8 +212,8 @@ struct CodeGenerator : ast::NodeVisitor {
         irBuilder.CreateBr( start );
 
         irBuilder.SetInsertPoint( start );
-        ValuePointer condition =
-            generate< ValuePointer >( statement->condition )->toBoolean();
+        Value condition =
+            generate< Value >( statement->condition )->toBoolean();
         irBuilder.CreateCondBr( condition->toLlvm(), loop, end );
 
         irBuilder.SetInsertPoint( loop );
@@ -232,25 +229,25 @@ struct CodeGenerator : ast::NodeVisitor {
     // ------------------------------------------------------------------------
 
     boost::any visit( ast::BinaryOperationExpression expression ) {
-        auto leftValue = generate< ValuePointer >( expression->leftOperand );
-        auto rightValue = generate< ValuePointer >( expression->rightOperand );
+        auto leftValue = generate< Value >( expression->leftOperand );
+        auto rightValue = generate< Value >( expression->rightOperand );
         return leftValue->generateBinaryOperation(
             expression->operation, rightValue );
     }
 
     boost::any visit( ast::BooleanConstant constant ) {
-        return Value::createBooleanConstant( constant->value );
+        return _Value::createBooleanConstant( constant->value );
     }
 
     boost::any visit( ast::CallExpression expression ) {
-        auto value = generate< ValuePointer >( expression->callee );
-        std::vector< ValuePointer > arguments( expression->arguments.size() );
+        auto value = generate< Value >( expression->callee );
+        std::vector< Value > arguments( expression->arguments.size() );
         std::transform(
             expression->arguments.cbegin(),
             expression->arguments.cend(),
             arguments.begin(),
-            [this]( ast::Expression expression ) -> ValuePointer {
-                return generate< ValuePointer >( expression );
+            [this]( ast::Expression expression ) -> Value {
+                return generate< Value >( expression );
             }
         );
         return value->generateCall( arguments );
@@ -266,21 +263,21 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::IntegerConstant constant ) {
-        return Value::createIntegerConstant( constant->value );
+        return _Value::createIntegerConstant( constant->value );
     }
 
     boost::any visit( ast::MemberAccessExpression expression ) {
-        auto value = generate< ValuePointer >( expression->object );
+        auto value = generate< Value >( expression->object );
         return value->generateMemberAccess(
             expression->memberIdentifier );
     }
 
     boost::any visit( ast::StringConstant constant ) {
-        return Value::createStringConstant( constant->value );
+        return _Value::createStringConstant( constant->value );
     }
 
     boost::any visit( ast::UnaryOperationExpression expression ) {
-        auto value = generate< ValuePointer >( expression->operand );
+        auto value = generate< Value >( expression->operand );
         return value->generateUnaryOperation( expression->operation );
     }
 
@@ -302,8 +299,8 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::PointerType pointerType ) {
         auto type = std::make_shared< PointerType >(
-            generate< ValueTypePointer >( pointerType->targetType ) );
-        return std::static_pointer_cast< ValueType >( type );
+            generate< ValueType >( pointerType->targetType ) );
+        return std::static_pointer_cast< _ValueType >( type );
     }
 
     boost::any visit( ast::StringType ) {

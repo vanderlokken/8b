@@ -11,56 +11,56 @@
 namespace _8b {
 
 
-class Value;
-typedef std::shared_ptr<const Value> ValuePointer;
+class _Value;
+typedef std::shared_ptr<const _Value> Value;
 
-class ValueType;
-typedef std::shared_ptr<ValueType> ValueTypePointer;
+class _ValueType;
+typedef std::shared_ptr<_ValueType> ValueType;
 
 
-class Value : public std::enable_shared_from_this<Value> {
+class _Value : public std::enable_shared_from_this<_Value> {
 public:
 
-    static ValuePointer createVariable( ValueTypePointer type, const std::string &identifier );
-    static ValuePointer createReference( ValueTypePointer type, llvm::Value* );
-    static ValuePointer createSsaValue( ValueTypePointer type, llvm::Value* );
-    static ValuePointer createUnusableValue();
-    static ValuePointer createIntegerConstant( int );
-    static ValuePointer createBooleanConstant( bool );
-    static ValuePointer createStringConstant( const std::string& );
+    static Value createVariable( ValueType type, const std::string &identifier );
+    static Value createReference( ValueType type, llvm::Value* );
+    static Value createSsaValue( ValueType type, llvm::Value* );
+    static Value createUnusableValue();
+    static Value createIntegerConstant( int );
+    static Value createBooleanConstant( bool );
+    static Value createStringConstant( const std::string& );
 
-    Value( ValueTypePointer type, llvm::Value *llvmValue, bool assignable )
+    _Value( ValueType type, llvm::Value *llvmValue, bool assignable )
         : _type( type ), _llvmValue( llvmValue ), _assignable( assignable ) {}
 
-    ValueTypePointer getType() const;
+    ValueType getType() const;
     llvm::Value* toLlvm() const;
     llvm::Value* toLlvmPointer() const;
 
-    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer ) const;
-    ValuePointer generateUnaryOperation( UnaryOperation ) const;
-    ValuePointer generateCall( const std::vector<ValuePointer>& ) const;
-    ValuePointer generateMemberAccess( const std::string &memberIdentifier ) const;
+    Value generateBinaryOperation( BinaryOperation, Value ) const;
+    Value generateUnaryOperation( UnaryOperation ) const;
+    Value generateCall( const std::vector<Value>& ) const;
+    Value generateMemberAccess( const std::string &memberIdentifier ) const;
 
-    ValuePointer toBoolean() const;
-    ValuePointer toInteger() const;
+    Value toBoolean() const;
+    Value toInteger() const;
 
 protected:
-    ValueTypePointer _type;
+    ValueType _type;
     llvm::Value *_llvmValue;
     bool _assignable;
 };
 
 
-class ValueType {
+class _ValueType {
 public:
-    virtual ~ValueType() {}
+    virtual ~_ValueType() {}
 
     virtual llvm::Type* toLlvm() const;
 
-    virtual ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
-    virtual ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
-    virtual ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
-    virtual ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    virtual Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
+    virtual Value generateUnaryOperation( UnaryOperation, Value ) const;
+    virtual Value generateCall( Value, const std::vector<Value>& ) const;
+    virtual Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
 
     virtual bool isIntegerSubset() const;
     virtual bool isRealSubset() const;
@@ -70,12 +70,12 @@ protected:
 };
 
 
-class IntegerType : public ValueType {
+class IntegerType : public _ValueType {
 public:
-    static ValueTypePointer get( int bitWidth = 32 );
+    static ValueType get( int bitWidth = 32 );
 
-    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
-    ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
+    Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
+    Value generateUnaryOperation( UnaryOperation, Value ) const;
 
 private:
     IntegerType( int bitWidth );
@@ -85,12 +85,12 @@ private:
 };
 
 
-class BooleanType : public ValueType {
+class BooleanType : public _ValueType {
 public:
-    static ValueTypePointer get();
+    static ValueType get();
 
-    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
-    ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
+    Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
+    Value generateUnaryOperation( UnaryOperation, Value ) const;
 
 private:
     BooleanType();
@@ -100,69 +100,69 @@ private:
 };
 
 
-class PointerType : public ValueType {
+class PointerType : public _ValueType {
 public:
-    PointerType( ValueTypePointer targetType );
+    PointerType( ValueType targetType );
 
-    ValuePointer generateBinaryOperation( BinaryOperation, ValuePointer, ValuePointer ) const;
-    ValuePointer generateUnaryOperation( UnaryOperation, ValuePointer ) const;
-    ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
+    Value generateUnaryOperation( UnaryOperation, Value ) const;
+    Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
 
 private:
-    ValueTypePointer _targetType;
+    ValueType _targetType;
 };
 
 
-class StringType : public ValueType {
+class StringType : public _ValueType {
 public:
-    static ValueTypePointer get();
+    static ValueType get();
 
-    ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
 
 private:
     StringType();
 };
 
 
-class FunctionType : public ValueType {
+class FunctionType : public _ValueType {
 public:
 
     class Builder {
     public:
         void addArgument(
-            const std::string &identifier, ValueTypePointer type );
-        void setReturnType( ValueTypePointer type );
+            const std::string &identifier, ValueType type );
+        void setReturnType( ValueType type );
 
-        ValueTypePointer build() const;
+        ValueType build() const;
 
     private:
-        std::vector< ValueTypePointer > _argumentTypes;
-        ValueTypePointer _resultType;
+        std::vector< ValueType > _argumentTypes;
+        ValueType _resultType;
     };
 
-    FunctionType( const std::vector<ValueTypePointer>&, ValueTypePointer resultType = nullptr );
+    FunctionType( const std::vector<ValueType>&, ValueType resultType = nullptr );
 
-    ValuePointer generateCall( ValuePointer, const std::vector<ValuePointer>& ) const;
+    Value generateCall( Value, const std::vector<Value>& ) const;
 
 private:
-    ValueTypePointer _resultType;
+    ValueType _resultType;
 };
 
 
-class ClassType : public ValueType {
+class ClassType : public _ValueType {
 public:
 
     struct Member {
         std::string identifier;
-        ValueTypePointer type;
+        ValueType type;
     };
 
     class Builder {
     public:
-        void addMember( const std::string &identifier, ValueTypePointer type );
-        void addMethod( const std::string &identifier, ValuePointer function );
+        void addMember( const std::string &identifier, ValueType type );
+        void addMethod( const std::string &identifier, Value function );
 
-        ValueTypePointer build() const;
+        ValueType build() const;
 
     private:
         std::vector<ClassType::Member> _members;
@@ -170,7 +170,7 @@ public:
 
     ClassType( const std::vector<Member>& );
 
-    ValuePointer generateMemberAccess( ValuePointer, const std::string &memberIdentifier ) const;
+    Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
 
 private:
     std::vector<Member> _members;
