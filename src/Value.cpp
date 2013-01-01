@@ -5,8 +5,6 @@
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/Type.h>
 
-#include "Exception.h"
-
 namespace _8b {
 
 extern llvm::IRBuilder<> irBuilder;
@@ -63,7 +61,7 @@ llvm::Value* _Value::toLlvmPointer() const {
     if( _assignable )
         return _llvmValue;
     else
-        throwRuntimeError( "Cannot reference a temporary value" );
+        throw SemanticError( "Cannot reference a temporary value" );
 }
 
 Value _Value::generateBinaryOperation( BinaryOperation operation, Value rightOperand ) const {
@@ -103,8 +101,7 @@ Value _ValueType::generateBinaryOperation( BinaryOperation operation, Value firs
         operation == BinaryOperation::LogicAnd )
         return first->toBoolean()->generateBinaryOperation( operation, second->toBoolean() );
 
-    throwRuntimeError( "This type doesn't implement specified operation" );
-    return 0;
+    throw SemanticError( "This type doesn't implement specified operation" );
 }
 
 Value _ValueType::generateUnaryOperation( UnaryOperation operation, Value operand ) const {
@@ -113,18 +110,16 @@ Value _ValueType::generateUnaryOperation( UnaryOperation operation, Value operan
         return _Value::createSsaValue(
             std::make_shared<PointerType>(operand->getType()), operand->toLlvmPointer() );
 
-    throwRuntimeError( "This type doesn't implement specified operation" );
-    return 0;
+    throw SemanticError( "This type doesn't implement specified operation" );
 }
 
 Value _ValueType::generateCall( Value, const std::vector<Value>& ) const {
-    throwRuntimeError( "This type doesn't implement invokation" );
-    return 0;
+    throw SemanticError( "This type doesn't implement invokation" );
 }
 
 Value _ValueType::generateMemberAccess( Value, const std::string& ) const {
-    throwRuntimeError( "Not implemented or this type doesn't have specified property" );
-    return 0;
+    throw SemanticError(
+        "Not implemented or this type doesn't have specified property" );
 }
 
 bool _ValueType::isIntegerSubset() const {
@@ -140,7 +135,7 @@ bool _ValueType::isRealSubset() const {
 ValueType IntegerType::get( int bitWidth ) {
 
     if( bitWidth != 32 )
-        throwRuntimeError( "Not supported" );
+        throw SemanticError( "Not supported" );
 
     static const ValueType instance( new IntegerType(bitWidth) );
     return instance;

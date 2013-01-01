@@ -1,14 +1,13 @@
 #pragma once
 
-#include "Noexcept.h"
-
 #include <string>
 
 namespace _8b {
-    
+
 enum class TokenType {
     Null,
     Whitespace,
+    LineEnd,
     Comment,
     Identifier,
     KeywordAnd,
@@ -58,13 +57,24 @@ enum class TokenType {
     PunctuatorClosingBracket
 };
 
+struct SourceLocation {
+
+    SourceLocation() : lineNumber( 1 ), columnNumber( 1 ),
+        lineBeginningOffset( 0 ), tokenBeginningOffset( 0 ) {}
+
+    size_t lineNumber;
+    size_t columnNumber;
+    size_t lineBeginningOffset;
+    size_t tokenBeginningOffset;
+};
+
 struct Token {
-    
-    Token( TokenType type = TokenType::Null, const std::string &lexem = "" );
-    
-    bool operator == ( const Token& ) const noexcept;
-    bool operator != ( const Token& ) const noexcept;
-    
+
+    Token( SourceLocation sourceLocation, TokenType tokenType = TokenType::Null,
+            const std::string &lexem = "" )
+        : sourceLocation( sourceLocation ), type( tokenType ), lexem( lexem ) {}
+
+    SourceLocation sourceLocation;
     TokenType type;
     std::string lexem;
 };

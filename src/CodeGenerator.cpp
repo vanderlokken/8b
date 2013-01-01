@@ -15,7 +15,16 @@ struct CodeGenerator : ast::NodeVisitor {
     // This function runs an appropriate code generation routine for the
     // specified ast::Node object and returns the result of the specified type
     template< class ReturnType > ReturnType generate( ast::Node node ) {
-        return boost::any_cast< ReturnType >( node->acceptVisitor(this) );
+        return boost::any_cast< ReturnType >( _generate(node) );
+    }
+
+    boost::any _generate( ast::Node node ) {
+        try {
+            return node->acceptVisitor( this );
+
+        } catch( SemanticError &error ) {
+            throw CompilationError( error.what(), node->sourceLocation );
+        }
     }
 
     boost::any visit( ast::Module module ) {
@@ -25,10 +34,10 @@ struct CodeGenerator : ast::NodeVisitor {
         LexicalScope lexicalScope( _symbolTable );
 
         for( auto &declaration : module->classDeclarations )
-            declaration->acceptVisitor( this );
+            _generate( declaration );
 
         for( auto &declaration : module->functionDeclarations )
-            declaration->acceptVisitor( this );
+            _generate( declaration );
 
         return _currentModule;
     }
@@ -40,7 +49,7 @@ struct CodeGenerator : ast::NodeVisitor {
         for( auto &declaration : classDeclaration->memberDeclarations ) {
 
             if( declaration->initializer )
-                throwRuntimeError( "Not implemented" );
+                throw NotImplementedError();
 
             builder.addMember(
                 declaration->identifier,
@@ -104,7 +113,7 @@ struct CodeGenerator : ast::NodeVisitor {
                 declaration->arguments[i]->identifier, value );
         }
 
-        declaration->block->acceptVisitor( this );
+        _generate( declaration->block );
 
         return _currentFunction;
     }
@@ -115,13 +124,15 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::Block block ) {
 
+        // FIXME: a standalone block statement will cause an incorrect result
+
         llvm::BasicBlock *basicBlock = createBasicBlock();
         irBuilder.SetInsertPoint( basicBlock );
 
         LexicalScope lexicalScope( _symbolTable );
 
         for( auto &statement : block->statements )
-            statement->acceptVisitor( this );
+            _generate( statement );
 
         return basicBlock;
     }
@@ -187,9 +198,10 @@ struct CodeGenerator : ast::NodeVisitor {
                 BinaryOperation::Assignment, initializerValue );
 
         } else {
-            throwRuntimeError(
+            throw CompilationError(
                 "A variable declaration statement doesn't contain neither type "
-                "identifier nor initializer expression" );
+                "identifier nor initializer expression",
+                declaration->sourceLocation );
         }
 
         _symbolTable.addValue( declaration->identifier, variable );
@@ -254,12 +266,17 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::IdentifierExpression expression ) {
-        return _symbolTable.lookupValue( expression->identifier );
+        try {
+            return _symbolTable.lookupValue( expression->identifier );
+
+        } catch( SymbolLookupError& ) {
+            throw CompilationError(
+                "Undeclared variable", expression->sourceLocation );
+        }
     }
 
     boost::any visit( ast::InstanceExpression ) {
-        throwRuntimeError( "Not implemented" );
-        return boost::any();
+        throw NotImplementedError();
     }
 
     boost::any visit( ast::IntegerConstant constant ) {
@@ -294,7 +311,13 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::NamedType namedType ) {
-        return _symbolTable.lookupType( namedType->identifier );
+        try {
+            return _symbolTable.lookupType( namedType->identifier );
+
+        } catch( SymbolLookupError& ) {
+            throw CompilationError(
+                "Undeclared type", namedType->sourceLocation );
+        }
     }
 
     boost::any visit( ast::PointerType pointerType ) {

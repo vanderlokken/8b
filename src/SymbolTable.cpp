@@ -1,7 +1,5 @@
 #include "SymbolTable.h"
 
-#include "Exception.h"
-
 namespace _8b {
 
 void SymbolTable::enterLexicalScope() {
@@ -26,7 +24,7 @@ Value SymbolTable::lookupValue( const std::string &name ) const {
         if( it != scope._values.end() )
             return it->second;
     }
-    throwRuntimeError( "Undeclared identifier" );
+    throw SymbolLookupError();
 }
 
 ValueType SymbolTable::lookupType( const std::string &name ) const {
@@ -35,7 +33,7 @@ ValueType SymbolTable::lookupType( const std::string &name ) const {
         if( it != scope._types.end() )
             return it->second;
     }
-    throwRuntimeError( "Undeclared type" );
+    throw SymbolLookupError();
 }
 
 }

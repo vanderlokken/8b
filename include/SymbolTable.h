@@ -2,6 +2,7 @@
 
 #include <list>
 #include <map>
+#include <stdexcept>
 #include <string>
 
 #include <boost/noncopyable.hpp>
@@ -28,6 +29,10 @@ private:
         std::map<std::string, ValueType> _types;
     };
     std::list< LexicalScope > _scopes;
+};
+
+struct SymbolLookupError : std::exception {
+    SymbolLookupError() : std::exception( "Undeclared identifier" ) {}
 };
 
 class LexicalScope : boost::noncopyable {

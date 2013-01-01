@@ -14,6 +14,8 @@ struct Parser : public NodeVisitor {
 
     template< class NodeType > std::shared_ptr< NodeType > parse() {
         auto node = std::make_shared< NodeType >();
+        node->sourceLocation =
+            _lexicalAnalyser.getCurrentToken().sourceLocation;
         node->acceptVisitor( this );
         return node;
     }
@@ -36,7 +38,8 @@ struct Parser : public NodeVisitor {
                 module->functionDeclarations.push_back(
                     parse<_FunctionDeclaration>() );
             else
-                throwRuntimeError( "Expected class or function declaration" );
+                throw createSyntaxError(
+                    "Expected class or function declaration" );
         while( !currentTokenIs(TokenType::Null) );
 
         return boost::any();
@@ -58,7 +61,8 @@ struct Parser : public NodeVisitor {
                 classDeclaration->methodDeclarations.push_back(
                     parse<_FunctionDeclaration>() );
             else
-                throwRuntimeError( "Expected member or method declaration" );
+                throw createSyntaxError(
+                    "Expected member or method declaration" );
         }
 
         extractToken( TokenType::PunctuatorClosingBrace );
@@ -278,10 +282,11 @@ struct Parser : public NodeVisitor {
 
         case TokenType::KeywordPointerTo: {
 
-            extractToken();
+            auto sourceLocation = extractToken().sourceLocation;
             extractToken( TokenType::PunctuatorOpeningParenthesis );
 
             auto expression = std::make_shared<_UnaryOperationExpression>();
+            expression->sourceLocation = sourceLocation;
             expression->operation = UnaryOperation::Addressing;
             expression->operand = parse<_Expression>();
 
@@ -292,7 +297,7 @@ struct Parser : public NodeVisitor {
 
         }
 
-        throwRuntimeError( "Unexpected token" );
+        throw createSyntaxError( "Unexpected token" );
     }
 
     Expression leftDenotation( Expression expression ) {
@@ -330,9 +335,9 @@ struct Parser : public NodeVisitor {
 
         for( auto &rule : binaryOperatorParsingRules ) {
             if( tokenType == rule.tokenType ) {
-                extractToken();
+                auto sourceLocation = extractToken().sourceLocation;
                 auto result = std::make_shared<_BinaryOperationExpression>();
-                result->acceptVisitor(this);
+                result->sourceLocation = sourceLocation;
                 result->operation = rule.operation;
                 result->leftOperand = expression;
                 result->rightOperand = parseExpression( bindingPower );
@@ -342,8 +347,9 @@ struct Parser : public NodeVisitor {
 
         for( auto &rule : unaryOperatorParsingRules ) {
             if( tokenType == rule.tokenType ) {
-                extractToken();
+                auto sourceLocation = extractToken().sourceLocation;
                 auto result = std::make_shared<_UnaryOperationExpression>();
+                result->sourceLocation = sourceLocation;
                 result->operation = rule.operation;
                 result->operand = expression;
                 return result;
@@ -351,8 +357,9 @@ struct Parser : public NodeVisitor {
         }
 
         if( tokenType == TokenType::PunctuatorOpeningParenthesis ) {
-            extractToken();
+            auto sourceLocation = extractToken().sourceLocation;
             auto result = std::make_shared<_CallExpression>();
+            result->sourceLocation = sourceLocation;
             result->callee = expression;
             while( !currentTokenIs(TokenType::PunctuatorClosingParenthesis) ) {
                 if( !result->arguments.empty() )
@@ -364,8 +371,9 @@ struct Parser : public NodeVisitor {
         }
 
         if( tokenType == TokenType::PunctuatorDot ) {
-            extractToken();
+            auto sourceLocation = extractToken().sourceLocation;
             auto result = std::make_shared<_MemberAccessExpression>();
+            result->sourceLocation = sourceLocation;
             result->object = expression;
             result->memberIdentifier = parseIdentifier();
             return result;
@@ -385,7 +393,7 @@ struct Parser : public NodeVisitor {
         else if( currentTokenIs(TokenType::KeywordFalse) )
             booleanConstant->value = false;
         else
-            throwRuntimeError( "Expected 'true' or 'false'" );
+            throw createSyntaxError( "Expected 'true' or 'false'" );
 
         extractToken();
 
@@ -408,8 +416,7 @@ struct Parser : public NodeVisitor {
 
     boost::any visit( IntegerConstant integerConstant ) {
         std::stringstream stream;
-        stream <<
-            _lexicalAnalyser.extractToken( TokenType::ConstantInteger ).lexem;
+        stream << extractToken( TokenType::ConstantInteger ).lexem;
         stream >> integerConstant->value;
         return boost::any();
     }
@@ -419,8 +426,7 @@ struct Parser : public NodeVisitor {
     }
 
     boost::any visit( StringConstant stringConstant ) {
-        const auto &lexem =
-            _lexicalAnalyser.extractToken( TokenType::ConstantString ).lexem;
+        const auto &lexem = extractToken( TokenType::ConstantString ).lexem;
         // Remove surrounding '"' symbols
         stringConstant->value = lexem.substr( 1, lexem.size() - 2 );
         return boost::any();
@@ -451,7 +457,7 @@ struct Parser : public NodeVisitor {
             return parse<_StringType>();
         }
 
-        throwRuntimeError( "Expected type" );
+        throw createSyntaxError( "Expected type" );
     }
 
     boost::any visit( BooleanType type ) {
@@ -495,7 +501,14 @@ struct Parser : public NodeVisitor {
     }
 
     Token extractToken( TokenType tokenType ) {
-        return _lexicalAnalyser.extractToken( tokenType );
+        if( !currentTokenIs(tokenType) )
+            throw createSyntaxError( "Unexpected token" );
+        return _lexicalAnalyser.extractToken();
+    }
+
+    SyntaxError createSyntaxError( const char *message ) const {
+        return SyntaxError(
+            message, _lexicalAnalyser.getCurrentToken().sourceLocation );
     }
 
     LexicalAnalyser &_lexicalAnalyser;

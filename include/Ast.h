@@ -7,6 +7,7 @@
 #include <boost/any.hpp>
 
 #include "Operation.h"
+#include "Token.h"
 
 namespace _8b {
 namespace ast {
@@ -16,6 +17,8 @@ struct NodeVisitor;
 struct _Node : std::enable_shared_from_this<_Node> {
     virtual ~_Node() {}
     virtual boost::any acceptVisitor( NodeVisitor* ) = 0;
+
+    SourceLocation sourceLocation;
 };
 
 #define _8b_visitable( className )                                     \

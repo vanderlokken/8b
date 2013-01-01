@@ -2,7 +2,6 @@
 
 #include <regex>
 
-#include "CheckToken.h"
 #include "Exception.h"
 
 namespace _8b {
@@ -10,33 +9,26 @@ namespace _8b {
 LexicalAnalyser::LexicalAnalyser( std::istream &stream )
     : _source( (std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>() ),
       _first( _source.begin() ),
-      _last( _source.end() )
-{
-    _currentToken = readToken();
-    _nextToken = readToken();
-    return;
-}
+      _last( _source.end() ),
+      _currentToken( readToken() ),
+      _nextToken( readToken() )
+{}
 
-Token LexicalAnalyser::getCurrentToken() const noexcept {
+const Token& LexicalAnalyser::getCurrentToken() const {
     return _currentToken;
 }
 
-Token LexicalAnalyser::getNextToken() const noexcept {
+const Token& LexicalAnalyser::getNextToken() const {
     return _nextToken;
 }
 
 Token LexicalAnalyser::extractToken() {
     Token result = _currentToken;
-    
+
     _currentToken = _nextToken;
     _nextToken = readToken();
-    
-    return result;
-}
 
-Token LexicalAnalyser::extractToken( TokenType tokenType ) {
-    checkToken( getCurrentToken(), tokenType );
-    return extractToken();
+    return result;
 }
 
 Token LexicalAnalyser::readToken() {
@@ -48,7 +40,8 @@ Token LexicalAnalyser::readToken() {
     };
 
     static const Rule rules[] = {
-        { std::regex("\\s+"), TokenType::Whitespace, false },
+        { std::regex("[ \\t\\v\\f\\r]+"), TokenType::Whitespace, false },
+        { std::regex("\\n"), TokenType::LineEnd, false },
         { std::regex("and(?![_0-9a-zA-Z])"), TokenType::KeywordAnd, false },
         { std::regex("boolean(?![_0-9a-zA-Z])"), TokenType::KeywordBoolean, false },
         { std::regex("class(?![_0-9a-zA-Z])"), TokenType::KeywordClass, false },
@@ -70,7 +63,7 @@ Token LexicalAnalyser::readToken() {
         { std::regex("true(?![_0-9a-zA-Z])"), TokenType::KeywordTrue, false },
         { std::regex("variable(?![_0-9a-zA-Z])"), TokenType::KeywordVariable, false },
         { std::regex("while(?![_0-9a-zA-Z])"), TokenType::KeywordWhile, false },
-        { std::regex("[_a-zA-Z][_0-9a-zA-Z]*"), TokenType::Identifier, true },        
+        { std::regex("[_a-zA-Z][_0-9a-zA-Z]*"), TokenType::Identifier, true },
         { std::regex(";"), TokenType::PunctuatorSemicolon, false },
         { std::regex(","), TokenType::PunctuatorComma, false },
         { std::regex("\\."), TokenType::PunctuatorDot, false },
@@ -101,22 +94,39 @@ Token LexicalAnalyser::readToken() {
 
     for( auto &rule : rules ) {
 
-        if( std::regex_search(_first, _last, matchResult, rule.regex, std::regex_constants::match_continuous) ) {
-            
-            _first += matchResult.length();
-            
-            if( rule.tokenType == TokenType::Whitespace || rule.tokenType == TokenType::Comment )
+        if( std::regex_search(_first, _last, matchResult, rule.regex,
+                std::regex_constants::match_continuous) )
+        {
+            SourceLocation currentSourceLocation = _sourceLocation;
+
+            const auto tokenLength = matchResult.length();
+
+            _first += tokenLength;
+            _sourceLocation.columnNumber += tokenLength;
+            _sourceLocation.tokenBeginningOffset += tokenLength;
+
+            if( rule.tokenType == TokenType::LineEnd ) {
+                _sourceLocation.lineNumber++;
+                _sourceLocation.columnNumber = 1;
+                _sourceLocation.lineBeginningOffset =
+                    std::distance( _source.cbegin(), _first );
+            }
+
+            if( rule.tokenType == TokenType::Whitespace ||
+                rule.tokenType == TokenType::Comment ||
+                rule.tokenType == TokenType::LineEnd )
                 return readToken();
 
-            return Token( rule.tokenType, rule.storeLexem ? matchResult.str() : "" );
+            return Token( currentSourceLocation, rule.tokenType,
+                rule.storeLexem ? matchResult.str() : "" );
         }
 
     }
 
     if( _first == _last )
-        return Token();
-    
-    throwRuntimeError( "Unknown token" );
+        return Token( _sourceLocation );
+
+    throw LexicalError( "Unexpected character sequence", _sourceLocation );
 }
 
 }

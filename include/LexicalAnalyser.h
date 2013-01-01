@@ -10,19 +10,20 @@ namespace _8b {
 class LexicalAnalyser {
 public:
     LexicalAnalyser( std::istream &stream );
-    
-    Token getCurrentToken() const noexcept;
-    Token getNextToken() const noexcept;
-    
+
+    const Token& getCurrentToken() const;
+    const Token& getNextToken() const;
+
     Token extractToken();
-    Token extractToken( TokenType );
 
 private:
     Token readToken();
-    
+
     std::string _source;
     std::string::const_iterator _first;
     std::string::const_iterator _last;
+
+    SourceLocation _sourceLocation;
 
     Token _currentToken;
     Token _nextToken;

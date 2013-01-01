@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -9,6 +10,11 @@
 #include "Operation.h"
 
 namespace _8b {
+
+
+struct SemanticError : std::exception {
+    SemanticError( const char *message ) : std::exception( message ) {}
+};
 
 
 class _Value;
