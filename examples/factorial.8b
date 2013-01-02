@@ -1,0 +1,11 @@
+function factorial( value integer ) integer {
+    if( value ) {
+        return value * factorial( value - 1 );
+    } else {
+        return 1;
+    }
+}
+
+function main() integer {
+    return factorial( 5 );
+}

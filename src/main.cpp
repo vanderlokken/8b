@@ -16,6 +16,7 @@ using namespace _8b;
 const std::string filename = "G:/Users/Lokken/Desktop/test.8b";
 
 void printSourceLine( SourceLocation sourceLocation ) {
+    // TODO: trim indentation
     std::ifstream input( filename, std::ios::binary );
     input.seekg( sourceLocation.lineBeginningOffset );
     std::string line;

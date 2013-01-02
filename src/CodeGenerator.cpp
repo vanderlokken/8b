@@ -75,8 +75,9 @@ struct CodeGenerator : ast::NodeVisitor {
             builder.addArgument( argument->identifier, type );
         }
 
-        builder.setReturnType(
-            generate< ValueType >( declaration->returnType ) );
+        if( declaration->returnType )
+            builder.setReturnType(
+                generate< ValueType >( declaration->returnType ) );
 
         return builder.build();
     }
@@ -115,6 +116,8 @@ struct CodeGenerator : ast::NodeVisitor {
 
         _generate( declaration->block );
 
+        // TODO: check whether a function returns or not
+
         return _currentFunction;
     }
 
@@ -131,8 +134,12 @@ struct CodeGenerator : ast::NodeVisitor {
 
         LexicalScope lexicalScope( _symbolTable );
 
-        for( auto &statement : block->statements )
+        for( auto &statement : block->statements ) {
+            if( basicBlock->getTerminator() )
+                throw CompilationError(
+                    "Unreachable code", statement->sourceLocation );
             _generate( statement );
+        }
 
         return basicBlock;
     }
@@ -159,11 +166,8 @@ struct CodeGenerator : ast::NodeVisitor {
             generate< Value >( statement->condition )->toBoolean();
         irBuilder.CreateCondBr( condition->toLlvm(), trueBranch, falseBranch );
 
-        irBuilder.SetInsertPoint( trueBranch );
-        irBuilder.CreateBr( end );
-
-        irBuilder.SetInsertPoint( falseBranch );
-        irBuilder.CreateBr( end );
+        createBranchIfNeeded( trueBranch, end );
+        createBranchIfNeeded( falseBranch, end );
 
         irBuilder.SetInsertPoint( end );
 
@@ -228,8 +232,7 @@ struct CodeGenerator : ast::NodeVisitor {
             generate< Value >( statement->condition )->toBoolean();
         irBuilder.CreateCondBr( condition->toLlvm(), loop, end );
 
-        irBuilder.SetInsertPoint( loop );
-        irBuilder.CreateBr( start );
+        createBranchIfNeeded( loop, start );
 
         irBuilder.SetInsertPoint( end );
 
@@ -337,6 +340,13 @@ struct CodeGenerator : ast::NodeVisitor {
     llvm::BasicBlock* createBasicBlock() {
         return llvm::BasicBlock::Create(
             irBuilder.getContext(), "", _currentFunction );
+    }
+
+    void createBranchIfNeeded( llvm::BasicBlock *from, llvm::BasicBlock *to ) {
+        if( !from->getTerminator() ) {
+            irBuilder.SetInsertPoint( from );
+            irBuilder.CreateBr( to );
+        }
     }
 
     SymbolTable _symbolTable;
