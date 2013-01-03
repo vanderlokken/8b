@@ -1,6 +1,10 @@
 #include <fstream>
 #include <iostream>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
+#include <boost/program_options.hpp>
+
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/JIT.h>
@@ -13,36 +17,72 @@
 
 using namespace _8b;
 
-const std::string filename = "G:/Users/Lokken/Desktop/test.8b";
+struct CommandLineArguments {
+    std::string filename;
+};
 
-void printSourceLine( SourceLocation sourceLocation ) {
-    // TODO: trim indentation
+CommandLineArguments parseCommandLineArguments( int argc, char **argv ) {
+
+    namespace options = boost::program_options;
+
+    options::options_description optional;
+    optional.add_options()
+        ( "help", "displays help" )
+        ( "filename", "file to compile" );
+
+    options::positional_options_description positional;
+    positional.add( "filename", -1 );
+
+    options::variables_map variables;
+    options::store(
+        options::command_line_parser(argc, argv).options(optional).
+            positional(positional).run(), variables );
+    options::notify( variables );
+
+    if( variables.count("help") ) {
+        std::cout << optional << std::endl;
+        std::exit( 1 );
+    }
+
+    if( !variables.count("filename") ) {
+        std::cerr << "No input file specified" << std::endl;
+        std::exit( 1 );
+    }
+
+    CommandLineArguments arguments;
+    arguments.filename = variables["filename"].as< std::string >();
+    return arguments;
+}
+
+void printSourceLine(
+    const std::string &filename, SourceLocation sourceLocation )
+{
+
     std::ifstream input( filename, std::ios::binary );
+
     input.seekg( sourceLocation.lineBeginningOffset );
+
     std::string line;
     std::getline( input, line );
-    std::cout << line << std::endl;
-    for( size_t index = 0; index < sourceLocation.tokenBeginningOffset -
-            sourceLocation.lineBeginningOffset; ++index )
-        std::cout << " ";
-    std::cout << "^~~~" << std::endl;
+
+    // Trim indentation
+    size_t lineLength = line.size();
+    boost::trim_left( line );
+    size_t indentationLength = lineLength - line.size();
+
+    std::cerr << line << std::endl;
+
+    std::string spaces( sourceLocation.tokenBeginningOffset -
+        sourceLocation.lineBeginningOffset - indentationLength, ' ' );
+
+    std::cerr << spaces + "^~~~" << std::endl;
 }
 
-void printError( const char *message, SourceLocation sourceLocation ) {
-    std::cout << "<filename>("
-              << sourceLocation.lineNumber
-              << ", "
-              << sourceLocation.columnNumber
-              << "): error: "
-              << message
-              << std::endl;
-    std::cout << std::endl;
-    printSourceLine( sourceLocation );
-    std::cout << std::endl;
-}
+int main( int argc, char **argv ) {
 
-int main() {
-    std::ifstream input( filename, std::ios::binary );
+    auto commandLineArguments = parseCommandLineArguments( argc, argv );
+
+    std::ifstream input( commandLineArguments.filename, std::ios::binary );
 
     try {
         LexicalAnalyser lexicalAnalyser( input );
@@ -53,20 +93,30 @@ int main() {
 
         llvm::InitializeNativeTarget();
 
-        llvm::ExecutionEngine *executionEngine = llvm::ExecutionEngine::createJIT( module );
+        llvm::ExecutionEngine *executionEngine =
+            llvm::ExecutionEngine::createJIT( module );
         llvm::Function *main = executionEngine->FindFunctionNamed( "main" );
 
-        std::vector<llvm::GenericValue> arguments;
-        llvm::GenericValue result = executionEngine->runFunction( main, arguments );
+        std::vector< llvm::GenericValue > arguments;
+        llvm::GenericValue result =
+            executionEngine->runFunction( main, arguments );
 
-        std::cout << "Result is: " << result.IntVal.getLimitedValue();
+        std::cout << "Exit code: " << result.IntVal.getLimitedValue();
 
     } catch( CompilationError &error ) {
 
-        printError( error.what(), error.sourceLocation );
+        SourceLocation sourceLocation = error.sourceLocation;
+
+        std::cerr << boost::format( "%s(%d, %d): error: %s\n" ) %
+            commandLineArguments.filename % sourceLocation.lineNumber %
+            sourceLocation.columnNumber % error.what();
+        std::cerr << std::endl;
+
+        printSourceLine( commandLineArguments.filename, sourceLocation );
+        std::cerr << std::endl;
 
     } catch( std::exception &exception ) {
-        std::cout << "Exception: " << exception.what();
+        std::cerr << "Exception: " << exception.what();
     }
 
     std::cin.get();
