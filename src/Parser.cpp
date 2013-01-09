@@ -280,19 +280,34 @@ struct Parser : public NodeVisitor {
             return expression;
         }
 
-        case TokenType::KeywordPointerTo: {
+        case TokenType::KeywordBoolean:
+        case TokenType::KeywordInteger:
+        case TokenType::KeywordReal:
+        case TokenType::KeywordPointerTo:
+        {
+            UnaryOperation operation;
+
+            if( tokenType == TokenType::KeywordBoolean )
+                operation =  UnaryOperation::BooleanConversion;
+            else if( tokenType == TokenType::KeywordInteger )
+                operation =  UnaryOperation::IntegerConversion;
+            else if( tokenType == TokenType::KeywordReal )
+                operation =  UnaryOperation::RealConversion;
+            else if( tokenType == TokenType::KeywordPointerTo )
+                operation =  UnaryOperation::PointerConversion;
 
             auto sourceLocation = extractToken().sourceLocation;
             extractToken( TokenType::PunctuatorOpeningParenthesis );
 
             auto expression = std::make_shared<_UnaryOperationExpression>();
             expression->sourceLocation = sourceLocation;
-            expression->operation = UnaryOperation::PointerConversion;
+            expression->operation = operation;
             expression->operand = parse<_Expression>();
 
             extractToken( TokenType::PunctuatorClosingParenthesis );
 
             return expression;
+
         }
 
         }
