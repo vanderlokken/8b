@@ -287,7 +287,7 @@ struct Parser : public NodeVisitor {
 
             auto expression = std::make_shared<_UnaryOperationExpression>();
             expression->sourceLocation = sourceLocation;
-            expression->operation = UnaryOperation::Addressing;
+            expression->operation = UnaryOperation::PointerConversion;
             expression->operand = parse<_Expression>();
 
             extractToken( TokenType::PunctuatorClosingParenthesis );
@@ -456,6 +456,8 @@ struct Parser : public NodeVisitor {
             return parse<_IntegerType>();
         case TokenType::KeywordPointer:
             return parse<_PointerType>();
+        case TokenType::KeywordReal:
+            return parse<_RealType>();
         case TokenType::KeywordString:
             return parse<_StringType>();
         }
@@ -483,6 +485,11 @@ struct Parser : public NodeVisitor {
         extractToken( TokenType::PunctuatorOpeningBracket );
         type->targetType = parse<_Type>();
         extractToken( TokenType::PunctuatorClosingBracket );
+        return boost::any();
+    }
+
+    boost::any visit( RealType type ) {
+        extractToken( TokenType::KeywordReal );
         return boost::any();
     }
 

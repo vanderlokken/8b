@@ -1,7 +1,7 @@
 #pragma once
 
 namespace _8b {
-    
+
 enum class UnaryOperation {
     Increment,
     Decrement,
@@ -9,7 +9,8 @@ enum class UnaryOperation {
     LogicInversion,
     BooleanConversion,
     IntegerConversion,
-    Addressing
+    RealConversion,
+    PointerConversion
 };
 
 enum class BinaryOperation {

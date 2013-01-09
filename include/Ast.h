@@ -49,6 +49,7 @@ struct _MemberAccessExpression;
 struct _Module;
 struct _NamedType;
 struct _PointerType;
+struct _RealType;
 struct _ReturnStatement;
 struct _Statement;
 struct _StringConstant;
@@ -77,6 +78,7 @@ typedef std::shared_ptr<_Module> Module;
 typedef std::shared_ptr<_NamedType> NamedType;
 typedef std::shared_ptr<_Node> Node;
 typedef std::shared_ptr<_PointerType> PointerType;
+typedef std::shared_ptr<_RealType> RealType;
 typedef std::shared_ptr<_ReturnStatement> ReturnStatement;
 typedef std::shared_ptr<_Statement> Statement;
 typedef std::shared_ptr<_StringConstant> StringConstant;
@@ -118,6 +120,7 @@ struct NodeVisitor {
     virtual boost::any visit( IntegerType ) = 0;
     virtual boost::any visit( NamedType ) = 0;
     virtual boost::any visit( PointerType ) = 0;
+    virtual boost::any visit( RealType ) = 0;
     virtual boost::any visit( StringType ) = 0;
 };
 
@@ -265,6 +268,10 @@ struct _NamedType : _Type {
 struct _PointerType : _Type {
     _8b_visitable( _PointerType );
     Type targetType;
+};
+
+struct _RealType : _Type {
+    _8b_visitable( _RealType );
 };
 
 struct _StringType : _Type {

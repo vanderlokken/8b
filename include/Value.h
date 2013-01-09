@@ -51,6 +51,7 @@ public:
 
     Value toBoolean() const;
     Value toInteger() const;
+    Value toReal() const;
 
 protected:
     ValueType _type;
@@ -58,6 +59,9 @@ protected:
     bool _assignable;
 };
 
+// ----------------------------------------------------------------------------
+//  _ValueType
+// ----------------------------------------------------------------------------
 
 class _ValueType {
 public:
@@ -65,48 +69,135 @@ public:
 
     virtual llvm::Type* toLlvm() const;
 
-    virtual Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
-    virtual Value generateUnaryOperation( UnaryOperation, Value ) const;
+    // Assignment operations
+
+    virtual Value generateAssignment( Value, Value ) const;
+    virtual Value generateIncrement( Value ) const;
+    virtual Value generateDecrement( Value ) const;
+
+    // Arithmetic operations
+
+    virtual Value generateAddition( Value, Value ) const;
+    virtual Value generateSubtraction( Value, Value ) const;
+    virtual Value generateMultiplication( Value, Value ) const;
+    virtual Value generateDivision( Value, Value ) const;
+
+    // Comparison operations
+
+    virtual Value generateLessComparison( Value, Value ) const;
+    virtual Value generateGreaterComparison( Value, Value ) const;
+
+    // Conversion operations
+
+    virtual Value generateBooleanConversion( Value ) const;
+    virtual Value generateIntegerConversion( Value ) const;
+    virtual Value generateRealConversion( Value ) const;
+
+    // Logic operations
+
+    Value generateLogicAnd( Value, Value ) const;
+    Value generateLogicOr( Value, Value ) const;
+
+    // Other operations
+
     virtual Value generateCall( Value, const std::vector<Value>& ) const;
-    virtual Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
+    virtual Value generateMemberAccess( Value, const std::string& ) const;
+
+    Value generatePointerConversion( Value ) const;
 
     virtual bool isIntegerSubset() const;
     virtual bool isRealSubset() const;
 
 protected:
+    static Value createUnusable( llvm::Value* );
+    static Value createBoolean( llvm::Value* );
+    static Value createInteger( llvm::Value* );
+    static Value createReal( llvm::Value* );
+
     llvm::Type *_type;
 };
 
+// ----------------------------------------------------------------------------
+//  UnusableType
+// ----------------------------------------------------------------------------
+
+class UnusableType : public _ValueType {
+public:
+    static ValueType get() {
+        static const ValueType instance = std::make_shared< UnusableType >();
+        return instance;
+    }
+};
+
+// ----------------------------------------------------------------------------
+//  IntegerType
+// ----------------------------------------------------------------------------
 
 class IntegerType : public _ValueType {
 public:
-    static ValueType get( int bitWidth = 32 );
 
-    Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
-    Value generateUnaryOperation( UnaryOperation, Value ) const;
-
-private:
     IntegerType( int bitWidth );
 
+    static ValueType get( int bitWidth = 32 );
+
+    // Assignment operations
+
+    virtual Value generateAssignment( Value, Value ) const;
+    virtual Value generateIncrement( Value ) const;
+    virtual Value generateDecrement( Value ) const;
+
+    // Arithmetic operations
+
+    virtual Value generateAddition( Value, Value ) const;
+    virtual Value generateSubtraction( Value, Value ) const;
+    virtual Value generateMultiplication( Value, Value ) const;
+    virtual Value generateDivision( Value, Value ) const;
+
+    // Comparison operations
+
+    virtual Value generateLessComparison( Value, Value ) const;
+    virtual Value generateGreaterComparison( Value, Value ) const;
+
+    // Conversion operations
+
+    virtual Value generateBooleanConversion( Value ) const;
+    virtual Value generateIntegerConversion( Value ) const;
+    virtual Value generateRealConversion( Value ) const;
+
+protected:
     bool isIntegerSubset() const;
     bool isRealSubset() const;
+
+    static llvm::Value* convertOperand( Value );
 };
 
+// ----------------------------------------------------------------------------
+//  BooleanType
+// ----------------------------------------------------------------------------
 
-class BooleanType : public _ValueType {
+class BooleanType : public IntegerType {
 public:
-    static ValueType get();
 
-    Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
-    Value generateUnaryOperation( UnaryOperation, Value ) const;
-
-private:
     BooleanType();
 
-    bool isIntegerSubset() const;
-    bool isRealSubset() const;
+    static ValueType get();
+
+    // Assignment operations
+
+    virtual Value generateAssignment( Value, Value ) const;
+    virtual Value generateIncrement( Value ) const;
+    virtual Value generateDecrement( Value ) const;
+
+    // Conversion operations
+
+    virtual Value generateBooleanConversion( Value ) const;
+    virtual Value generateIntegerConversion( Value ) const;
+    virtual Value generateRealConversion( Value ) const;
 };
 
+// ----------------------------------------------------------------------------
+//  PointerType
+// ----------------------------------------------------------------------------
 
 class PointerType : public _ValueType {
 public:
@@ -114,25 +205,79 @@ public:
 
     ValueType getTargetType() const;
 
-    Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
-    Value generateUnaryOperation( UnaryOperation, Value ) const;
-    Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
+    // Assignment operations
+
+    virtual Value generateAssignment( Value, Value ) const;
+
+    // Conversion operations
+
+    virtual Value generateBooleanConversion( Value ) const;
+    virtual Value generateIntegerConversion( Value ) const;
+
+    // Other operations
+
+    virtual Value generateMemberAccess( Value, const std::string& ) const;
 
 private:
     ValueType _targetType;
 };
 
+// ----------------------------------------------------------------------------
+//  RealType
+// ----------------------------------------------------------------------------
+
+class RealType : public _ValueType {
+public:
+
+    RealType( int bitWidth );
+
+    static ValueType get( int bitWidth = 32 );
+
+    // Assignment operations
+
+    virtual Value generateAssignment( Value, Value ) const;
+
+    // Arithmetic operations
+
+    virtual Value generateAddition( Value, Value ) const;
+    virtual Value generateSubtraction( Value, Value ) const;
+    virtual Value generateMultiplication( Value, Value ) const;
+    virtual Value generateDivision( Value, Value ) const;
+
+    // Comparison operations
+
+    virtual Value generateLessComparison( Value, Value ) const;
+    virtual Value generateGreaterComparison( Value, Value ) const;
+
+    // Conversion operations
+
+    virtual Value generateBooleanConversion( Value ) const;
+    virtual Value generateIntegerConversion( Value ) const;
+    virtual Value generateRealConversion( Value ) const;
+
+private:
+    bool isRealSubset() const;
+
+    static llvm::Value* convertOperand( Value );
+};
+
+// ----------------------------------------------------------------------------
+//  StringType
+// ----------------------------------------------------------------------------
 
 class StringType : public _ValueType {
 public:
+
+    StringType();
+
     static ValueType get();
 
-    Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
-
-private:
-    StringType();
+    Value generateMemberAccess( Value, const std::string& ) const;
 };
 
+// ----------------------------------------------------------------------------
+//  FunctionType
+// ----------------------------------------------------------------------------
 
 class FunctionType : public _ValueType {
 public:
@@ -158,6 +303,9 @@ private:
     ValueType _resultType;
 };
 
+// ----------------------------------------------------------------------------
+//  ClassType
+// ----------------------------------------------------------------------------
 
 class ClassType : public _ValueType {
 public:

@@ -382,6 +382,10 @@ struct CodeGenerator : ast::NodeVisitor {
         return std::static_pointer_cast< _ValueType >( type );
     }
 
+    boost::any visit( ast::RealType ) {
+        return RealType::get();
+    }
+
     boost::any visit( ast::StringType ) {
         return StringType::get();
     }
