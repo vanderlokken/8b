@@ -44,19 +44,61 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::ClassDeclaration classDeclaration ) {
 
-        ClassType::Builder builder;
+        std::vector< ClassType::Member > members;
 
         for( auto &declaration : classDeclaration->memberDeclarations ) {
 
             if( declaration->initializer )
                 throw NotImplementedError();
 
-            builder.addMember(
+            ClassType::Member member = {
                 declaration->identifier,
-                generate< ValueType >( declaration->type ) );
+                generate< ValueType >( declaration->type ) };
+
+            members.push_back( member );
         }
 
-        _symbolTable.addType( classDeclaration->identifier, builder.build() );
+        auto classType = std::make_shared< ClassType >(
+            classDeclaration->identifier, members );
+
+        _symbolTable.addType( classDeclaration->identifier, classType );
+
+        for( auto &declaration : classDeclaration->methodDeclarations ) {
+
+            // TODO: use something like 'generateFunction' which accepts an
+            // optional 'classType' argument to generate a method instead of
+            // a simple function
+
+            ast::FunctionDeclaration modifiedDeclaration =
+                std::make_shared< ast::_FunctionDeclaration >( *declaration );
+
+            modifiedDeclaration->identifier = classDeclaration->identifier +
+                "." + modifiedDeclaration->identifier;
+
+            // Add an additional argument 'instance pointer[Class]'
+
+            ast::NamedType instanceType =
+                std::make_shared< ast::_NamedType >();
+            instanceType->identifier = classDeclaration->identifier;
+
+            ast::PointerType pointerToInstanceType =
+                std::make_shared< ast::_PointerType >();
+            pointerToInstanceType->targetType = instanceType;
+
+            ast::FunctionArgument instanceArgument =
+                std::make_shared< ast::_FunctionArgument >();
+            instanceArgument->identifier = "instance";
+            instanceArgument->type = pointerToInstanceType;
+
+            modifiedDeclaration->arguments.insert(
+                modifiedDeclaration->arguments.begin(), instanceArgument );
+
+            _generate( modifiedDeclaration );
+
+            classType->addMethod(
+                declaration->identifier,
+                _symbolTable.lookupValue(modifiedDeclaration->identifier) );
+        }
 
         return boost::any();
     }
@@ -278,8 +320,19 @@ struct CodeGenerator : ast::NodeVisitor {
         }
     }
 
-    boost::any visit( ast::InstanceExpression ) {
-        throw NotImplementedError();
+    boost::any visit( ast::InstanceExpression expression ) {
+        try {
+            // TODO: do not create a new value each time the 'instance' keyword
+            // is met
+            auto value = _symbolTable.lookupValue( "instance" );
+            auto type = std::static_pointer_cast< PointerType >(
+                value->getType() )->getTargetType();
+            return _Value::createReference( type, value->toLlvm() );
+
+        } catch( SymbolLookupError& ) {
+            throw CompilationError( "'instance' is used outside a method",
+                expression->sourceLocation );
+        }
     }
 
     boost::any visit( ast::IntegerConstant constant ) {

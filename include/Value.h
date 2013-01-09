@@ -110,6 +110,8 @@ class PointerType : public _ValueType {
 public:
     PointerType( ValueType targetType );
 
+    ValueType getTargetType() const;
+
     Value generateBinaryOperation( BinaryOperation, Value, Value ) const;
     Value generateUnaryOperation( UnaryOperation, Value ) const;
     Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
@@ -163,23 +165,26 @@ public:
         ValueType type;
     };
 
-    class Builder {
-    public:
-        void addMember( const std::string &identifier, ValueType type );
-        void addMethod( const std::string &identifier, Value function );
-
-        ValueType build() const;
-
-    private:
-        std::vector<ClassType::Member> _members;
+    struct Method {
+        std::string identifier;
+        Value value;
     };
 
-    ClassType( const std::vector<Member>& );
+    ClassType(
+        const std::string &identifier, const std::vector<Member> &members );
 
-    Value generateMemberAccess( Value, const std::string &memberIdentifier ) const;
+    void addMethod( const std::string&, Value );
+
+    const std::string& getIdentifier() const;
+    const std::vector<Member>& getMembers() const;
+    const std::vector<Method>& getMethods() const;
+
+    Value generateMemberAccess( Value, const std::string& ) const;
 
 private:
-    std::vector<Member> _members;
+    std::string _identifier;
+    std::vector< Member > _members;
+    std::vector< Method > _methods;
 };
 
 

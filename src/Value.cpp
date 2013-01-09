@@ -5,6 +5,8 @@
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/Type.h>
 
+#include "Exception.h"
+
 namespace _8b {
 
 extern llvm::IRBuilder<> irBuilder;
@@ -289,6 +291,10 @@ PointerType::PointerType( ValueType targetType )
     _type = llvm::PointerType::getUnqual( targetType->toLlvm() );
 }
 
+ValueType PointerType::getTargetType() const {
+    return _targetType;
+}
+
 Value PointerType::generateUnaryOperation( UnaryOperation operation, Value operand ) const {
 
     if( operation == UnaryOperation::BooleanConversion )
@@ -401,47 +407,98 @@ Value FunctionType::generateCall( Value callee, const std::vector<Value> &argume
         return _Value::createUnusableValue();
 }
 
+// BoundMethodType
+
+class BoundMethodType : public _ValueType {
+public:
+    BoundMethodType( Value method, Value instance )
+        : _methodValueType( method->getType() ), _instance( instance ) {}
+
+    Value generateCall(
+        Value callee, const std::vector<Value> &arguments ) const
+    {
+        std::vector< Value > extendedArguments( arguments.size() + 1 );
+        extendedArguments[0] = _instance->generateUnaryOperation(
+            UnaryOperation::Addressing );
+        std::copy(
+            arguments.begin(), arguments.end(), extendedArguments.begin() + 1 );
+        return _methodValueType->generateCall( callee, extendedArguments );
+    }
+
+private:
+    ValueType _methodValueType;
+    Value _instance;
+};
+
 // ClassType
 
-void ClassType::Builder::addMember( const std::string &identifier, ValueType type ) {
-    ClassType::Member member = { identifier, type };
-    _members.push_back( member );
-}
-
-ValueType ClassType::Builder::build() const {
-    return std::make_shared<ClassType>( _members );
-}
-
-ClassType::ClassType( const std::vector<ClassType::Member> &members )
-    : _members( members )
+ClassType::ClassType(
+    const std::string &identifier, const std::vector<Member> &members )
+        : _identifier( identifier ), _members( members )
 {
-    std::vector< llvm::Type* > memberTypes( members.size() );
+    std::vector< llvm::Type* > memberTypes( _members.size() );
     std::transform(
-        members.cbegin(),
-        members.cend(),
+        _members.cbegin(),
+        _members.cend(),
         memberTypes.begin(),
-        []( const ClassType::Member &member ) -> llvm::Type* {
+        []( const Member &member ) -> llvm::Type* {
             return member.type->toLlvm();
         });
     _type = llvm::StructType::create( memberTypes );
 }
 
-Value ClassType::generateMemberAccess( Value classInstance, const std::string &memberIdentifier ) const {
+void ClassType::addMethod( const std::string &identifier, Value value ) {
+    Method method = { identifier, value };
+    _methods.push_back( method );
+}
 
+const std::string& ClassType::getIdentifier() const {
+    return _identifier;
+}
+
+const std::vector<ClassType::Member>& ClassType::getMembers() const {
+    return _members;
+}
+
+const std::vector<ClassType::Method>& ClassType::getMethods() const {
+    return _methods;
+}
+
+Value ClassType::generateMemberAccess(
+    Value classInstance, const std::string &identifier ) const
+{
     auto memberIterator = std::find_if(
         _members.cbegin(),
         _members.cend(),
-        [&memberIdentifier]( const ClassType::Member &member ) -> bool {
-            return member.identifier == memberIdentifier;
+        [&identifier]( const Member &member ) -> bool {
+            return member.identifier == identifier;
         });
 
-    if( memberIterator == _members.end() )
-        return _ValueType::generateMemberAccess( classInstance, memberIdentifier );
+    if( memberIterator != _members.end() ) {
 
-    const size_t memberIndex = std::distance( _members.begin(), memberIterator );
+        const size_t memberIndex =
+            std::distance( _members.begin(), memberIterator );
 
-    return _Value::createReference( memberIterator->type,
-        irBuilder.CreateStructGEP(classInstance->toLlvmPointer(), memberIndex) );
+        return _Value::createReference(
+            memberIterator->type, irBuilder.CreateStructGEP(
+                classInstance->toLlvmPointer(), memberIndex) );
+    }
+
+    auto methodIterator = std::find_if(
+        _methods.cbegin(),
+        _methods.cend(),
+        [&identifier]( const Method &method ) -> bool {
+            return method.identifier == identifier;
+        });
+
+    if( methodIterator != _methods.end() ) {
+        Value value = methodIterator->value;
+        ValueType type = std::make_shared< BoundMethodType >(
+            value, classInstance );
+        return _Value::createSsaValue( type, value->toLlvm() );
+    }
+
+    return _ValueType::generateMemberAccess( classInstance, identifier );
 }
 
 }

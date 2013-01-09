@@ -302,6 +302,9 @@ struct Parser : public NodeVisitor {
 
     Expression leftDenotation( Expression expression ) {
 
+        // TODO: use 'parse<_BinaryOperatorExpression>()' etc. instead of
+        // explicit parsing in this function
+
         struct UnaryOperatorParsingRule {
             TokenType tokenType;
             UnaryOperation operation;
