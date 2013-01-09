@@ -66,6 +66,10 @@ llvm::Value* _Value::toLlvmPointer() const {
         throw SemanticError( "Cannot reference a temporary value" );
 }
 
+bool _Value::isAssignable() const {
+    return _assignable;
+}
+
 Value _Value::generateBinaryOperation( BinaryOperation operation, Value rightOperand ) const {
     return _type->generateBinaryOperation( operation, shared_from_this(), rightOperand );
 }
@@ -137,7 +141,7 @@ bool _ValueType::isRealSubset() const {
 ValueType IntegerType::get( int bitWidth ) {
 
     if( bitWidth != 32 )
-        throw SemanticError( "Not supported" );
+        throw NotImplementedError();
 
     static const ValueType instance( new IntegerType(bitWidth) );
     return instance;
@@ -147,41 +151,45 @@ IntegerType::IntegerType( int bitWidth ) {
     _type = irBuilder.getInt32Ty();
 }
 
-Value IntegerType::generateBinaryOperation( BinaryOperation operation, Value first, Value second ) const {
-
+Value IntegerType::generateBinaryOperation(
+    BinaryOperation operation, Value first, Value second ) const
+{
     if( !second->getType()->isIntegerSubset() )
         return _ValueType::generateBinaryOperation( operation, first, second );
 
     llvm::Value *secondValue = second->toInteger()->toLlvm();
 
-    if( operation == BinaryOperation::Assignment ) {
-        irBuilder.CreateStore( secondValue, first->toLlvmPointer() );
-        return _Value::createUnusableValue();
-    }
+    switch( operation ) {
+    case BinaryOperation::Assignment:
+        {
+            irBuilder.CreateStore( secondValue, first->toLlvmPointer() );
+            return _Value::createUnusableValue();
+        }
 
-    if( operation == BinaryOperation::Addition )
+    case BinaryOperation::Addition:
         return _Value::createSsaValue( IntegerType::get(),
             irBuilder.CreateAdd(first->toLlvm(), secondValue) );
 
-    if( operation == BinaryOperation::Subtraction )
+    case BinaryOperation::Subtraction:
         return _Value::createSsaValue( IntegerType::get(),
             irBuilder.CreateSub(first->toLlvm(), secondValue) );
 
-    if( operation == BinaryOperation::Multiplication )
+    case BinaryOperation::Multiplication:
         return _Value::createSsaValue( IntegerType::get(),
             irBuilder.CreateMul(first->toLlvm(), secondValue) );
 
-    if( operation == BinaryOperation::Division )
+    case BinaryOperation::Division:
         return _Value::createSsaValue( IntegerType::get(),
             irBuilder.CreateSDiv(first->toLlvm(), secondValue) );
 
-    if( operation == BinaryOperation::LessComparison )
+    case BinaryOperation::LessComparison:
         return _Value::createSsaValue( BooleanType::get(),
             irBuilder.CreateICmpSLT(first->toLlvm(), secondValue) );
 
-    if( operation == BinaryOperation::GreaterComparison )
+    case BinaryOperation::GreaterComparison:
         return _Value::createSsaValue( BooleanType::get(),
             irBuilder.CreateICmpSGT(first->toLlvm(), secondValue) );
+    }
 
     return _ValueType::generateBinaryOperation( operation, first, second );
 }
@@ -479,9 +487,16 @@ Value ClassType::generateMemberAccess(
         const size_t memberIndex =
             std::distance( _members.begin(), memberIterator );
 
-        return _Value::createReference(
-            memberIterator->type, irBuilder.CreateStructGEP(
-                classInstance->toLlvmPointer(), memberIndex) );
+        if( classInstance->isAssignable() )
+            return _Value::createReference(
+                memberIterator->type, irBuilder.CreateStructGEP(
+                    classInstance->toLlvmPointer(), memberIndex) );
+        else {
+            unsigned indices[] = { memberIndex };
+            return _Value::createSsaValue(
+                memberIterator->type, irBuilder.CreateExtractValue(
+                classInstance->toLlvm(), indices) );
+        }
     }
 
     auto methodIterator = std::find_if(

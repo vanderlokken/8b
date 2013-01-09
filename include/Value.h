@@ -42,6 +42,8 @@ public:
     llvm::Value* toLlvm() const;
     llvm::Value* toLlvmPointer() const;
 
+    bool isAssignable() const;
+
     Value generateBinaryOperation( BinaryOperation, Value ) const;
     Value generateUnaryOperation( UnaryOperation ) const;
     Value generateCall( const std::vector<Value>& ) const;
