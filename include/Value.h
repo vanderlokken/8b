@@ -201,6 +201,9 @@ public:
 
 class PointerType : public _ValueType {
 public:
+
+    static ValueType get( ValueType targetType );
+
     PointerType( ValueType targetType );
 
     ValueType getTargetType() const;
@@ -282,25 +285,26 @@ public:
 class FunctionType : public _ValueType {
 public:
 
-    class Builder {
-    public:
-        void addArgument(
-            const std::string &identifier, ValueType type );
-        void setReturnType( ValueType type );
+    struct Argument {
 
-        ValueType build() const;
+        Argument( const std::string &identifier, ValueType type )
+            : identifier( identifier ), type( type ) {}
 
-    private:
-        std::vector< ValueType > _argumentTypes;
-        ValueType _resultType;
+        std::string identifier;
+        ValueType type;
     };
 
-    FunctionType( const std::vector<ValueType>&, ValueType resultType = nullptr );
+    FunctionType(
+        const std::vector<Argument>&, ValueType returnType = nullptr );
 
     Value generateCall( Value, const std::vector<Value>& ) const;
 
+    const std::vector<Argument>& getArguments() const;
+    ValueType getReturnType() const;
+
 private:
-    ValueType _resultType;
+    std::vector<Argument> _arguments;
+    ValueType _returnType;
 };
 
 // ----------------------------------------------------------------------------

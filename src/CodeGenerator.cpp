@@ -44,6 +44,8 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::ClassDeclaration classDeclaration ) {
 
+        // Generate a class type
+
         std::vector< ClassType::Member > members;
 
         for( auto &declaration : classDeclaration->memberDeclarations ) {
@@ -63,41 +65,11 @@ struct CodeGenerator : ast::NodeVisitor {
 
         _symbolTable.addType( classDeclaration->identifier, classType );
 
+        // Generate methods
+
         for( auto &declaration : classDeclaration->methodDeclarations ) {
-
-            // TODO: use something like 'generateFunction' which accepts an
-            // optional 'classType' argument to generate a method instead of
-            // a simple function
-
-            ast::FunctionDeclaration modifiedDeclaration =
-                std::make_shared< ast::_FunctionDeclaration >( *declaration );
-
-            modifiedDeclaration->identifier = classDeclaration->identifier +
-                "." + modifiedDeclaration->identifier;
-
-            // Add an additional argument 'instance pointer[Class]'
-
-            ast::NamedType instanceType =
-                std::make_shared< ast::_NamedType >();
-            instanceType->identifier = classDeclaration->identifier;
-
-            ast::PointerType pointerToInstanceType =
-                std::make_shared< ast::_PointerType >();
-            pointerToInstanceType->targetType = instanceType;
-
-            ast::FunctionArgument instanceArgument =
-                std::make_shared< ast::_FunctionArgument >();
-            instanceArgument->identifier = "instance";
-            instanceArgument->type = pointerToInstanceType;
-
-            modifiedDeclaration->arguments.insert(
-                modifiedDeclaration->arguments.begin(), instanceArgument );
-
-            _generate( modifiedDeclaration );
-
-            classType->addMethod(
-                declaration->identifier,
-                _symbolTable.lookupValue(modifiedDeclaration->identifier) );
+            Value value = generateFunction( declaration, classType );
+            classType->addMethod( declaration->identifier, value );
         }
 
         return boost::any();
@@ -108,59 +80,81 @@ struct CodeGenerator : ast::NodeVisitor {
         return boost::any();
     }
 
-    ValueType generateFunctionType( ast::FunctionDeclaration declaration ) {
+    ValueType generateFunctionType(
+        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+    {
+        std::vector< FunctionType::Argument > arguments;
+        arguments.reserve( declaration->arguments.size() );
 
-        FunctionType::Builder builder;
+        if( classType )
+            arguments.emplace_back( "instance", PointerType::get(classType) );
 
-        for( auto &argument : declaration->arguments ) {
-            ValueType type = generate< ValueType >( argument->type );
-            builder.addArgument( argument->identifier, type );
-        }
+        for( auto &argument : declaration->arguments )
+            arguments.emplace_back(
+                argument->identifier, generate< ValueType >( argument->type ) );
+
+        ValueType returnType;
 
         if( declaration->returnType )
-            builder.setReturnType(
-                generate< ValueType >( declaration->returnType ) );
+            returnType = generate< ValueType >( declaration->returnType );
 
-        return builder.build();
+        return std::make_shared< FunctionType >( arguments, returnType );
     }
 
-    boost::any visit( ast::FunctionDeclaration declaration ) {
+    Value generateFunction(
+        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+    {
+        // Genrate type
+        ValueType type = generateFunctionType( declaration, classType );
 
-        ValueType type = generateFunctionType( declaration );
+        llvm::FunctionType *llvmType =
+            static_cast< llvm::FunctionType* >( type->toLlvm() );
 
-        _currentFunction = llvm::Function::Create(
-            static_cast<llvm::FunctionType*>(type->toLlvm()),
-            llvm::Function::ExternalLinkage, declaration->identifier,
-            _currentModule );
+        // Generate identifier
+        std::string identifier = declaration->identifier;
+        if( classType )
+            identifier = std::static_pointer_cast< ClassType >(classType)->
+                getIdentifier() + "." + identifier;
 
-        _symbolTable.addValue( declaration->identifier,
-            _Value::createSsaValue(type, _currentFunction) );
+        // Generate value
+        _currentFunction = llvm::Function::Create( llvmType,
+            llvm::Function::ExternalLinkage, identifier, _currentModule );
 
+        Value value = _Value::createSsaValue( type, _currentFunction );
+        _symbolTable.addValue( declaration->identifier, value );
+
+        // Add function arguments to the symbol table
         LexicalScope lexicalScope( _symbolTable );
 
-        // Add arguments to the symbol table
+        size_t argumentIndex = 0;
 
-        for( size_t i = 0; i < declaration->arguments.size(); ++i ) {
+        for( const auto &argument :
+                std::static_pointer_cast< FunctionType >(type)->getArguments() )
+        {
+            auto argumentIterator = _currentFunction->arg_begin();
+            std::advance( argumentIterator, argumentIndex );
 
-            // TODO: do not generate ValueType from ast::Type but use
-            // previously generated
+            llvm::Value *llvmArgumentValue = argumentIterator;
 
-            auto argument = _currentFunction->getArgumentList().begin();
-            std::advance( argument, i );
+            if( classType && argumentIndex == 0 )
+                _symbolTable.addValue( "instance",
+                    _Value::createReference(classType, llvmArgumentValue) );
+            else
+                _symbolTable.addValue( argument.identifier,
+                    _Value::createSsaValue(argument.type, llvmArgumentValue) );
 
-            Value value = _Value::createSsaValue(
-                generate< ValueType >( declaration->arguments[i]->type ),
-                argument );
-
-            _symbolTable.addValue(
-                declaration->arguments[i]->identifier, value );
+            argumentIndex++;
         }
 
         _generate( declaration->block );
 
         // TODO: check whether a function returns or not
 
-        return _currentFunction;
+        return value;
+    }
+
+    boost::any visit( ast::FunctionDeclaration declaration ) {
+        return generateFunction( declaration );
     }
 
     // ------------------------------------------------------------------------
@@ -322,12 +316,7 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::InstanceExpression expression ) {
         try {
-            // TODO: do not create a new value each time the 'instance' keyword
-            // is met
-            auto value = _symbolTable.lookupValue( "instance" );
-            auto type = std::static_pointer_cast< PointerType >(
-                value->getType() )->getTargetType();
-            return _Value::createReference( type, value->toLlvm() );
+            return _symbolTable.lookupValue( "instance" );
 
         } catch( SymbolLookupError& ) {
             throw CompilationError( "'instance' is used outside a method",
@@ -377,7 +366,7 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::PointerType pointerType ) {
-        auto type = std::make_shared< PointerType >(
+        auto type = PointerType::get(
             generate< ValueType >( pointerType->targetType ) );
         return std::static_pointer_cast< _ValueType >( type );
     }

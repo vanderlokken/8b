@@ -231,8 +231,7 @@ Value _ValueType::generateMemberAccess( Value, const std::string& ) const {
 }
 
 Value _ValueType::generatePointerConversion( Value operand ) const {
-    ValueType resultType =
-        std::make_shared< PointerType >( operand->getType() );
+    ValueType resultType = PointerType::get( operand->getType() );
     return _Value::createSsaValue( resultType, operand->toLlvmPointer() );
 }
 
@@ -430,6 +429,10 @@ Value BooleanType::generateRealConversion( Value operand ) const {
 //  PointerType
 // ----------------------------------------------------------------------------
 
+ValueType PointerType::get( ValueType targetType ) {
+    return std::make_shared< PointerType >( targetType );
+}
+
 PointerType::PointerType( ValueType targetType )
     : _targetType( targetType )
 {
@@ -574,8 +577,7 @@ StringType::StringType() {
 Value StringType::generateMemberAccess( Value operand, const std::string &memberIdentifier ) const {
 
     if( memberIdentifier == "data" )
-        return _Value::createSsaValue(
-            std::make_shared<PointerType>(IntegerType::get()),
+        return _Value::createSsaValue( PointerType::get(IntegerType::get()),
             irBuilder.CreateStructGEP(operand->toLlvm(), 0) );
 
     return _ValueType::generateMemberAccess( operand, memberIdentifier );
@@ -585,58 +587,48 @@ Value StringType::generateMemberAccess( Value operand, const std::string &member
 //  FunctionType
 // ----------------------------------------------------------------------------
 
-void FunctionType::Builder::addArgument(
-    const std::string &identifier, ValueType type )
+FunctionType::FunctionType(
+    const std::vector<Argument> &arguments, ValueType returnType )
+        : _arguments( arguments ), _returnType( returnType )
 {
-    _argumentTypes.push_back( type );
-}
+    std::vector< llvm::Type* > llvmArgumentTypes;
+    llvmArgumentTypes.reserve( arguments.size() );
 
-void FunctionType::Builder::setReturnType( ValueType type ) {
-    _resultType = type;
-}
+    for( const auto &argument : _arguments )
+        llvmArgumentTypes.emplace_back( argument.type->toLlvm() );
 
-ValueType FunctionType::Builder::build() const {
-    return std::make_shared< FunctionType >( _argumentTypes, _resultType );
-}
+    llvm::Type *llvmReturnType =
+        _returnType ? _returnType->toLlvm() : irBuilder.getVoidTy();
 
-FunctionType::FunctionType( const std::vector<ValueType> &argumentTypes, ValueType resultType )
-    : _resultType( resultType )
-{
     const bool isVariableArgument = false;
-
-    std::vector<llvm::Type*> llvmArgumentTypes( argumentTypes.size() );
-
-    std::transform(
-        argumentTypes.cbegin(),
-        argumentTypes.cend(),
-        llvmArgumentTypes.begin(),
-        []( ValueType type ) -> llvm::Type* {
-            return type->toLlvm();
-        });
-
-    llvm::Type *llvmResultType = _resultType ? _resultType->toLlvm() : irBuilder.getVoidTy();
-
-    _type = llvm::FunctionType::get( llvmResultType, llvmArgumentTypes, isVariableArgument );
+    _type = llvm::FunctionType::get(
+        llvmReturnType, llvmArgumentTypes, isVariableArgument );
 }
 
-Value FunctionType::generateCall( Value callee, const std::vector<Value> &arguments ) const {
+Value FunctionType::generateCall(
+    Value callee, const std::vector<Value> &argumentValues ) const
+{
+    std::vector< llvm::Value* > llvmArgumentValues;
+    llvmArgumentValues.reserve( argumentValues.size() );
 
-    std::vector<llvm::Value*> llvmArguments( arguments.size() );
+    for( const auto &argumentValue : argumentValues )
+        llvmArgumentValues.emplace_back( argumentValue->toLlvm() );
 
-    std::transform(
-        arguments.cbegin(),
-        arguments.cend(),
-        llvmArguments.begin(),
-        []( Value value ) -> llvm::Value* {
-            return value->toLlvm();
-        });
+    llvm::Value *result =
+        irBuilder.CreateCall( callee->toLlvm(), llvmArgumentValues );
 
-    llvm::Value *llvmResultValue = irBuilder.CreateCall( callee->toLlvm(), llvmArguments );
-
-    if( _resultType )
-        return _Value::createSsaValue( _resultType, llvmResultValue );
+    if( _returnType )
+        return _Value::createSsaValue( _returnType, result );
     else
         return _Value::createUnusableValue();
+}
+
+const std::vector<FunctionType::Argument>& FunctionType::getArguments() const {
+    return _arguments;
+}
+
+ValueType FunctionType::getReturnType() const {
+    return _returnType;
 }
 
 // ----------------------------------------------------------------------------
