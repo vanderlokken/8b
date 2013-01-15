@@ -146,7 +146,14 @@ struct CodeGenerator : ast::NodeVisitor {
 
         generateBlock( declaration->block );
 
-        // TODO: check whether a function returns or not
+        // Check for the 'return' statement
+        if( !irBuilder.GetInsertBlock()->getTerminator() )
+            if( declaration->returnType )
+                throw CompilationError(
+                    "A function ends without the 'return' statement",
+                    declaration->sourceLocation );
+            else
+                irBuilder.CreateRetVoid();
 
         return value;
     }
@@ -213,7 +220,10 @@ struct CodeGenerator : ast::NodeVisitor {
         createBranchIfNeeded( trueBranch, end );
         createBranchIfNeeded( falseBranch, end );
 
-        irBuilder.SetInsertPoint( end );
+        if( end->getNumUses() )
+            irBuilder.SetInsertPoint( end );
+        else
+            end->eraseFromParent();
 
         return boost::any();
     }
