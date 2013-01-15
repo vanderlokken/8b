@@ -144,7 +144,7 @@ struct CodeGenerator : ast::NodeVisitor {
             argumentIndex++;
         }
 
-        _generate( declaration->block );
+        generateBlock( declaration->block );
 
         // TODO: check whether a function returns or not
 
@@ -159,23 +159,35 @@ struct CodeGenerator : ast::NodeVisitor {
     //  Statements
     // ------------------------------------------------------------------------
 
-    boost::any visit( ast::Block block ) {
+    llvm::BasicBlock* generateBlock(
+        ast::Block block, bool insertBasicBlock = true )
+    {
+        llvm::BasicBlock *basicBlock =
+            insertBasicBlock ? createBasicBlock() : irBuilder.GetInsertBlock();
 
-        // FIXME: a standalone block statement will cause an incorrect result
-
-        llvm::BasicBlock *basicBlock = createBasicBlock();
-        irBuilder.SetInsertPoint( basicBlock );
+        if( insertBasicBlock )
+            irBuilder.SetInsertPoint( basicBlock );
 
         LexicalScope lexicalScope( _symbolTable );
 
         for( auto &statement : block->statements ) {
-            if( basicBlock->getTerminator() )
+            if( irBuilder.GetInsertBlock()->getTerminator() )
                 throw CompilationError(
                     "Unreachable code", statement->sourceLocation );
             _generate( statement );
         }
 
         return basicBlock;
+    }
+
+    boost::any visit( ast::Block block ) {
+        // This method is called only for standalone explicit code blocks. In
+        // such cases there's no need to create a new basic block.
+
+        // Example: "statement; { statement; } statement;"
+
+        const bool insertBasicBlock = false;
+        return generateBlock( block, insertBasicBlock );
     }
 
     boost::any visit( ast::IfStatement statement ) {
@@ -185,10 +197,8 @@ struct CodeGenerator : ast::NodeVisitor {
         // "false" block exists or not.
 
         auto previous = irBuilder.GetInsertBlock();
-        auto trueBranch =
-            generate< llvm::BasicBlock* >( statement->trueBlock );
-        auto falseBranch =
-            generate< llvm::BasicBlock* >( statement->falseBlock );
+        auto trueBranch = generateBlock( statement->trueBlock );
+        auto falseBranch = generateBlock( statement->falseBlock );
         auto end = createBasicBlock();
 
         trueBranch->moveAfter( previous );
@@ -252,7 +262,7 @@ struct CodeGenerator : ast::NodeVisitor {
         auto previous = irBuilder.GetInsertBlock();
         auto    start = createBasicBlock();
         auto      end = createBasicBlock();
-        auto     loop = generate< llvm::BasicBlock* >( statement->block );
+        auto     loop = generateBlock( statement->block );
 
         start->moveAfter( previous );
         loop->moveAfter( start );
