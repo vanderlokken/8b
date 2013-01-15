@@ -664,20 +664,17 @@ ClassType::ClassType(
     const std::string &identifier, const std::vector<Member> &members )
         : _identifier( identifier ), _members( members )
 {
-    std::vector< llvm::Type* > memberTypes( _members.size() );
-    std::transform(
-        _members.cbegin(),
-        _members.cend(),
-        memberTypes.begin(),
-        []( const Member &member ) -> llvm::Type* {
-            return member.type->toLlvm();
-        });
-    _type = llvm::StructType::create( memberTypes );
+    std::vector< llvm::Type* > llvmMemberTypes;
+    llvmMemberTypes.reserve( _members.size() );
+
+    for( const auto &member : _members )
+        llvmMemberTypes.emplace_back( member.type->toLlvm() );
+
+    _type = llvm::StructType::create( llvmMemberTypes );
 }
 
 void ClassType::addMethod( const std::string &identifier, Value value ) {
-    Method method = { identifier, value };
-    _methods.push_back( method );
+    _methods.emplace_back( identifier, value );
 }
 
 const std::string& ClassType::getIdentifier() const {

@@ -32,10 +32,10 @@ struct Parser : public NodeVisitor {
 
         do
             if( currentTokenIs(TokenType::KeywordClass) )
-                module->classDeclarations.push_back(
+                module->classDeclarations.emplace_back(
                     parse<_ClassDeclaration>() );
             else if( currentTokenIs(TokenType::KeywordFunction) )
-                module->functionDeclarations.push_back(
+                module->functionDeclarations.emplace_back(
                     parse<_FunctionDeclaration>() );
             else
                 throw createSyntaxError(
@@ -55,10 +55,10 @@ struct Parser : public NodeVisitor {
 
         while( !currentTokenIs(TokenType::PunctuatorClosingBrace) ) {
             if( currentTokenIs(TokenType::KeywordVariable) )
-                classDeclaration->memberDeclarations.push_back(
+                classDeclaration->memberDeclarations.emplace_back(
                     parse<_VariableDeclaration>() );
             else if( currentTokenIs(TokenType::KeywordFunction) )
-                classDeclaration->methodDeclarations.push_back(
+                classDeclaration->methodDeclarations.emplace_back(
                     parse<_FunctionDeclaration>() );
             else
                 throw createSyntaxError(
@@ -89,7 +89,7 @@ struct Parser : public NodeVisitor {
             if( !functionDeclaration->arguments.empty() )
                 extractToken( TokenType::PunctuatorComma );
 
-            functionDeclaration->arguments.push_back(
+            functionDeclaration->arguments.emplace_back(
                 parse<_FunctionArgument>() );
         }
 
@@ -134,7 +134,7 @@ struct Parser : public NodeVisitor {
         extractToken( TokenType::PunctuatorOpeningBrace );
 
         while( !currentTokenIs(TokenType::PunctuatorClosingBrace) )
-            block->statements.push_back( parse<_Statement>() );
+            block->statements.emplace_back( parse<_Statement>() );
 
         extractToken( TokenType::PunctuatorClosingBrace );
 
@@ -382,7 +382,7 @@ struct Parser : public NodeVisitor {
             while( !currentTokenIs(TokenType::PunctuatorClosingParenthesis) ) {
                 if( !result->arguments.empty() )
                     extractToken( TokenType::PunctuatorComma );
-                result->arguments.push_back( parse<_Expression>() );
+                result->arguments.emplace_back( parse<_Expression>() );
             }
             extractToken( TokenType::PunctuatorClosingParenthesis );
             return result;

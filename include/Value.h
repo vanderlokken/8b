@@ -315,11 +315,19 @@ class ClassType : public _ValueType {
 public:
 
     struct Member {
+
+        Member( const std::string &identifier, ValueType type )
+            : identifier( identifier ), type( type ) {}
+
         std::string identifier;
         ValueType type;
     };
 
     struct Method {
+
+        Method( const std::string &identifier, Value value )
+            : identifier( identifier ), value( value ) {}
+
         std::string identifier;
         Value value;
     };

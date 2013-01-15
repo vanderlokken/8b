@@ -47,17 +47,15 @@ struct CodeGenerator : ast::NodeVisitor {
         // Generate a class type
 
         std::vector< ClassType::Member > members;
+        members.reserve( classDeclaration->memberDeclarations.size() );
 
         for( auto &declaration : classDeclaration->memberDeclarations ) {
 
             if( declaration->initializer )
                 throw NotImplementedError();
 
-            ClassType::Member member = {
-                declaration->identifier,
-                generate< ValueType >( declaration->type ) };
-
-            members.push_back( member );
+            members.emplace_back( declaration->identifier,
+                generate< ValueType >( declaration->type ) );
         }
 
         auto classType = std::make_shared< ClassType >(
@@ -292,15 +290,13 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::CallExpression expression ) {
         auto value = generate< Value >( expression->callee );
-        std::vector< Value > arguments( expression->arguments.size() );
-        std::transform(
-            expression->arguments.cbegin(),
-            expression->arguments.cend(),
-            arguments.begin(),
-            [this]( ast::Expression expression ) -> Value {
-                return generate< Value >( expression );
-            }
-        );
+
+        std::vector< Value > arguments;
+        arguments.reserve( expression->arguments.size() );
+
+        for( const auto &argumentExpression : expression->arguments )
+            arguments.emplace_back( generate< Value >( argumentExpression ) );
+
         return value->generateCall( arguments );
     }
 
