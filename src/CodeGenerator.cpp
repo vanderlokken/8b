@@ -1,5 +1,7 @@
 #include "CodeGenerator.h"
 
+#include <vector>
+
 #include <llvm/Support/IRBuilder.h>
 
 #include "Exception.h"
@@ -39,6 +41,8 @@ struct CodeGenerator : ast::NodeVisitor {
         for( auto &declaration : module->functionDeclarations )
             _generate( declaration );
 
+        generateFunctionImplementations();
+
         return _currentModule;
     }
 
@@ -66,7 +70,7 @@ struct CodeGenerator : ast::NodeVisitor {
         // Generate methods
 
         for( auto &declaration : classDeclaration->methodDeclarations ) {
-            Value value = generateFunction( declaration, classType );
+            Value value = generateFunctionHeader( declaration, classType );
             classType->addMethod( declaration->identifier, value );
         }
 
@@ -99,27 +103,49 @@ struct CodeGenerator : ast::NodeVisitor {
         return std::make_shared< FunctionType >( arguments, returnType );
     }
 
-    Value generateFunction(
+    static std::string generateFunctionIdentifier(
         ast::FunctionDeclaration declaration, ValueType classType = nullptr )
     {
-        // Genrate type
+        if( !classType )
+            return declaration->identifier;
+
+        return std::static_pointer_cast< ClassType >(classType)->
+            getIdentifier() + "." + declaration->identifier;
+    }
+
+    Value generateFunctionHeader(
+        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+    {
         ValueType type = generateFunctionType( declaration, classType );
 
         llvm::FunctionType *llvmType =
             static_cast< llvm::FunctionType* >( type->toLlvm() );
 
-        // Generate identifier
-        std::string identifier = declaration->identifier;
-        if( classType )
-            identifier = std::static_pointer_cast< ClassType >(classType)->
-                getIdentifier() + "." + identifier;
+        std::string identifier =
+            generateFunctionIdentifier( declaration, classType );
 
-        // Generate value
-        _currentFunction = llvm::Function::Create( llvmType,
+        llvm::Function *functionValue = llvm::Function::Create( llvmType,
             llvm::Function::ExternalLinkage, identifier, _currentModule );
 
-        Value value = _Value::createSsaValue( type, _currentFunction );
-        _symbolTable.addValue( declaration->identifier, value );
+        Value value = _Value::createSsaValue( type, functionValue );
+        _symbolTable.addValue( identifier, value );
+
+        // Add a task to generate function implementation later
+        _functionGenerationTasks.emplace_back( declaration, classType );
+
+        return value;
+    }
+
+    void generateFunctionImplementation(
+        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+    {
+        std::string identifier =
+            generateFunctionIdentifier( declaration, classType );
+
+        auto value = _symbolTable.lookupValue( identifier );
+        auto type = value->getType();
+
+        _currentFunction = static_cast< llvm::Function* >( value->toLlvm() );
 
         // Add function arguments to the symbol table
         LexicalScope lexicalScope( _symbolTable );
@@ -154,12 +180,27 @@ struct CodeGenerator : ast::NodeVisitor {
                     declaration->sourceLocation );
             else
                 irBuilder.CreateRetVoid();
+    }
 
-        return value;
+    void generateFunctionImplementations() {
+
+        // It's necessary to generate function implementations after the
+        // generation of function headers. To understand the reason look at the
+        // following example:
+
+        //    function x() integer{ return y(); }
+        //    function y() integer{ return x(); }
+
+        // It's not possible to generate any function before the generation of
+        // the header of the other one.
+
+        for( const auto &task : _functionGenerationTasks ) {
+            generateFunctionImplementation( task.declaration, task.classType );
+        }
     }
 
     boost::any visit( ast::FunctionDeclaration declaration ) {
-        return generateFunction( declaration );
+        return generateFunctionHeader( declaration );
     }
 
     // ------------------------------------------------------------------------
@@ -415,6 +456,17 @@ struct CodeGenerator : ast::NodeVisitor {
 
     llvm::Module *_currentModule;
     llvm::Function *_currentFunction;
+
+    struct FunctionGenerationTask {
+        FunctionGenerationTask(
+                ast::FunctionDeclaration declaration, ValueType classType )
+            : declaration( declaration ), classType( classType ) {}
+
+        ast::FunctionDeclaration declaration;
+        ValueType classType;
+    };
+
+    std::vector< FunctionGenerationTask > _functionGenerationTasks;
 };
 
 llvm::Module* generateCode( ast::Module module ) {
