@@ -339,10 +339,51 @@ struct CodeGenerator : ast::NodeVisitor {
     // ------------------------------------------------------------------------
 
     boost::any visit( ast::BinaryOperationExpression expression ) {
-        auto leftValue = generate< Value >( expression->leftOperand );
-        auto rightValue = generate< Value >( expression->rightOperand );
-        return leftValue->generateBinaryOperation(
-            expression->operation, rightValue );
+        const BinaryOperation operation = expression->operation;
+
+        if( operation != BinaryOperation::LogicAnd &&
+            operation != BinaryOperation::LogicOr )
+        {
+            auto leftValue = generate< Value >( expression->leftOperand );
+            auto rightValue = generate< Value >( expression->rightOperand );
+            return leftValue->generateBinaryOperation( operation, rightValue );
+        }
+
+        // The following code implements specific operand evaluation for the
+        // BinaryOperation::LogicAnd and BinaryOperation::LogicOr
+
+        llvm::BasicBlock *current = irBuilder.GetInsertBlock();
+        llvm::BasicBlock *evaluateRight = createBasicBlock();
+        llvm::BasicBlock *end = createBasicBlock();
+
+        llvm::Value *leftValue = generate< Value >(
+            expression->leftOperand )->toBoolean()->toLlvm();
+
+        if( operation == BinaryOperation::LogicAnd )
+            irBuilder.CreateCondBr( leftValue, evaluateRight, end );
+        else // operation == BinaryOperation::LogicOr
+            irBuilder.CreateCondBr( leftValue, end, evaluateRight );
+
+        irBuilder.SetInsertPoint( evaluateRight );
+        llvm::Value *rightValue = generate< Value >(
+            expression->rightOperand )->toBoolean()->toLlvm();
+        irBuilder.CreateBr( end );
+
+        irBuilder.SetInsertPoint( end );
+
+        const unsigned incomingBranchCount = 2;
+
+        llvm::PHINode *resultValue =
+            irBuilder.CreatePHI( irBuilder.getInt1Ty(), incomingBranchCount );
+
+        if( operation == BinaryOperation::LogicAnd )
+            resultValue->addIncoming( irBuilder.getFalse(), current );
+        else // operation == BinaryOperation::LogicOr
+            resultValue->addIncoming( irBuilder.getTrue(), current );
+
+        resultValue->addIncoming( rightValue, evaluateRight );
+
+        return _Value::createSsaValue( BooleanType::get(), resultValue );
     }
 
     boost::any visit( ast::BooleanConstant constant ) {

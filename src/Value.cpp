@@ -208,16 +208,15 @@ Value _ValueType::generateRealConversion( Value ) const {
 
 // Logic operations
 
+// The following methods intentionally have no implementation due to specific
+// operand evaluation rules. See CodeGenerator.cpp for the further details.
+
 Value _ValueType::generateLogicAnd( Value first, Value second ) const {
-    llvm::Value *result = irBuilder.CreateAnd(
-        first->toBoolean()->toLlvm(), second->toBoolean()->toLlvm() );
-    return createBoolean( result );
+    throw NotImplementedError();
 }
 
 Value _ValueType::generateLogicOr( Value first, Value second ) const {
-    llvm::Value *result = irBuilder.CreateOr(
-        first->toBoolean()->toLlvm(), second->toBoolean()->toLlvm() );
-    return createBoolean( result );
+    throw NotImplementedError();
 }
 
 // Other operations
