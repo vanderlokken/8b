@@ -1,5 +1,7 @@
 #include "Value.h"
 
+#include <boost/format.hpp>
+
 #include <llvm/Argument.h>
 #include <llvm/Constants.h>
 #include <llvm/Support/IRBuilder.h>
@@ -10,6 +12,22 @@
 namespace _8b {
 
 extern llvm::IRBuilder<> irBuilder;
+
+// ----------------------------------------------------------------------------
+//  Utility functions
+// ----------------------------------------------------------------------------
+
+template<class T>
+std::string format( const std::string &formatString, const T& argument ) {
+    return boost::str( boost::format(formatString) % argument );
+}
+
+template<class T, class U>
+std::string format(
+    const std::string &formatString, const T& first, const U& second )
+{
+    return boost::str( boost::format(formatString) % first % second );
+}
 
 // ----------------------------------------------------------------------------
 //  Value
@@ -276,8 +294,7 @@ ValueType IntegerType::get( int bitWidth ) {
     return instance;
 }
 
-IntegerType::IntegerType( int bitWidth ) {
-
+IntegerType::IntegerType( int bitWidth ) : _bitWidth( bitWidth ) {
     switch( bitWidth ) {
     case 1:
         _type = irBuilder.getInt1Ty();
@@ -366,6 +383,10 @@ Value IntegerType::generateRealConversion( Value operand ) const {
 
 // Miscellaneous
 
+std::string IntegerType::getName() const {
+    return format( "integer[%1%]", _bitWidth );
+}
+
 bool IntegerType::isIntegerSubset() const {
     return true;
 }
@@ -424,6 +445,12 @@ Value BooleanType::generateRealConversion( Value operand ) const {
     return createReal( result );
 }
 
+// Miscellaneous
+
+std::string BooleanType::getName() const {
+    return "boolean";
+}
+
 // ----------------------------------------------------------------------------
 //  PointerType
 // ----------------------------------------------------------------------------
@@ -432,9 +459,7 @@ ValueType PointerType::get( ValueType targetType ) {
     return std::make_shared< PointerType >( targetType );
 }
 
-PointerType::PointerType( ValueType targetType )
-    : _targetType( targetType )
-{
+PointerType::PointerType( ValueType targetType ) : _targetType( targetType ) {
     _type = llvm::PointerType::getUnqual( targetType->toLlvm() );
 }
 
@@ -472,6 +497,12 @@ Value PointerType::generateMemberAccess(
     return _ValueType::generateMemberAccess( operand, identifier );
 }
 
+// Miscellaneous
+
+std::string PointerType::getName() const {
+    return format( "pointer[%1%]", _targetType->getName() );
+}
+
 // ----------------------------------------------------------------------------
 //  RealType
 // ----------------------------------------------------------------------------
@@ -485,7 +516,7 @@ ValueType RealType::get( int bitWidth ) {
     return instance;
 }
 
-RealType::RealType( int bitWidth ) {
+RealType::RealType( int bitWidth ) : _bitWidth( bitWidth ) {
     _type = irBuilder.getFloatTy();
 }
 
@@ -550,6 +581,10 @@ Value RealType::generateRealConversion( Value operand ) const {
 
 // Miscellaneous
 
+std::string RealType::getName() const {
+    return format( "real[%1%]", _bitWidth );
+}
+
 bool RealType::isRealSubset() const {
     return true;
 }
@@ -582,6 +617,12 @@ Value StringType::generateMemberAccess( Value operand, const std::string &member
     return _ValueType::generateMemberAccess( operand, memberIdentifier );
 }
 
+// Miscellaneous
+
+std::string StringType::getName() const {
+    return "string";
+}
+
 // ----------------------------------------------------------------------------
 //  FunctionType
 // ----------------------------------------------------------------------------
@@ -607,11 +648,31 @@ FunctionType::FunctionType(
 Value FunctionType::generateCall(
     Value callee, const std::vector<Value> &argumentValues ) const
 {
+    if( argumentValues.size() != _arguments.size() )
+        throw SemanticError(
+            format("Invalid number of arguments: %1% instead of %2%",
+                argumentValues.size(), _arguments.size()) );
+
     std::vector< llvm::Value* > llvmArgumentValues;
     llvmArgumentValues.reserve( argumentValues.size() );
 
-    for( const auto &argumentValue : argumentValues )
-        llvmArgumentValues.emplace_back( argumentValue->toLlvm() );
+    for( size_t index = 0; index < _arguments.size(); ++index ) {
+
+        ValueType valueType = argumentValues[index]->getType();
+        ValueType requiredType = _arguments[index].type;
+
+        // TODO: implement type checking in a more reliable way
+        if( valueType != requiredType &&
+            valueType->getName() != requiredType->getName() )
+        {
+            throw ArgumentTypeError(
+                format("Invalid argument type: %1% instead of %2%",
+                    valueType->getName(), requiredType->getName()),
+                index );
+        }
+
+        llvmArgumentValues.emplace_back( argumentValues[index]->toLlvm() );
+    }
 
     llvm::Value *result =
         irBuilder.CreateCall( callee->toLlvm(), llvmArgumentValues );
@@ -628,6 +689,26 @@ const std::vector<FunctionType::Argument>& FunctionType::getArguments() const {
 
 ValueType FunctionType::getReturnType() const {
     return _returnType;
+}
+
+// Miscellaneous
+
+std::string FunctionType::getName() const {
+    std::string argumentTypes;
+
+    for( Argument argument : _arguments ) {
+        if( !argumentTypes.empty() )
+            argumentTypes = format(
+                "%1%, %2%", argumentTypes, argument.type->getName() );
+        else
+            argumentTypes = format( "%1%", argument.type->getName() );
+    }
+
+    if( _returnType )
+        return format( "function( %1% ) %2%", argumentTypes,
+            _returnType->getName() );
+    else
+        return format( "function( %1% )", argumentTypes );
 }
 
 // ----------------------------------------------------------------------------
@@ -648,6 +729,12 @@ public:
         std::copy(
             arguments.begin(), arguments.end(), extendedArguments.begin() + 1 );
         return _methodValueType->generateCall( callee, extendedArguments );
+    }
+
+    // Miscellaneous
+
+    std::string getName() const {
+        return "\"bound method\"";
     }
 
 private:
@@ -730,6 +817,12 @@ Value ClassType::generateMemberAccess(
     }
 
     return _ValueType::generateMemberAccess( classInstance, identifier );
+}
+
+// Miscellaneous
+
+std::string ClassType::getName() const {
+    return _identifier;
 }
 
 }

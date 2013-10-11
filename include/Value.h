@@ -1,19 +1,25 @@
 #pragma once
 
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include <llvm/Value.h>
 
+#include "Exception.h"
 #include "Operation.h"
 
 namespace _8b {
 
 
-struct SemanticError : std::exception {
-    SemanticError( const char *message ) : std::exception( message ) {}
+struct SemanticError : public Exception {
+    SemanticError( const std::string& message ) : Exception( message ) {}
+};
+
+struct ArgumentTypeError : public SemanticError {
+    ArgumentTypeError( const std::string& message, size_t argumentIndex )
+        : SemanticError( message ), argumentIndex( argumentIndex ) {}
+    size_t argumentIndex;
 };
 
 
@@ -108,6 +114,8 @@ public:
     virtual bool isIntegerSubset() const;
     virtual bool isRealSubset() const;
 
+    virtual std::string getName() const = 0;
+
 protected:
     static Value createUnusable( llvm::Value* );
     static Value createBoolean( llvm::Value* );
@@ -123,6 +131,8 @@ protected:
 
 class UnusableType : public _ValueType {
 public:
+    virtual std::string getName() const { return "\"not a value\""; }
+
     static ValueType get() {
         static const ValueType instance = std::make_shared< UnusableType >();
         return instance;
@@ -164,11 +174,17 @@ public:
     virtual Value generateIntegerConversion( Value ) const;
     virtual Value generateRealConversion( Value ) const;
 
+    // Other operations
+
+    virtual std::string getName() const;
+
 protected:
     bool isIntegerSubset() const;
     bool isRealSubset() const;
 
     static llvm::Value* convertOperand( Value );
+
+    int _bitWidth;
 };
 
 // ----------------------------------------------------------------------------
@@ -193,6 +209,10 @@ public:
     virtual Value generateBooleanConversion( Value ) const;
     virtual Value generateIntegerConversion( Value ) const;
     virtual Value generateRealConversion( Value ) const;
+
+    // Other operations
+
+    virtual std::string getName() const;
 };
 
 // ----------------------------------------------------------------------------
@@ -220,6 +240,8 @@ public:
     // Other operations
 
     virtual Value generateMemberAccess( Value, const std::string& ) const;
+
+    virtual std::string getName() const;
 
 private:
     ValueType _targetType;
@@ -258,10 +280,16 @@ public:
     virtual Value generateIntegerConversion( Value ) const;
     virtual Value generateRealConversion( Value ) const;
 
+    // Other operations
+
+    virtual std::string getName() const;
+
 private:
     bool isRealSubset() const;
 
     static llvm::Value* convertOperand( Value );
+
+    int _bitWidth;
 };
 
 // ----------------------------------------------------------------------------
@@ -275,7 +303,11 @@ public:
 
     static ValueType get();
 
-    Value generateMemberAccess( Value, const std::string& ) const;
+    // Other operations
+
+    virtual Value generateMemberAccess( Value, const std::string& ) const;
+
+    virtual std::string getName() const;
 };
 
 // ----------------------------------------------------------------------------
@@ -297,10 +329,14 @@ public:
     FunctionType(
         const std::vector<Argument>&, ValueType returnType = nullptr );
 
-    Value generateCall( Value, const std::vector<Value>& ) const;
-
     const std::vector<Argument>& getArguments() const;
     ValueType getReturnType() const;
+
+    // Other operations
+
+    virtual Value generateCall( Value, const std::vector<Value>& ) const;
+
+    virtual std::string getName() const;
 
 private:
     std::vector<Argument> _arguments;
@@ -341,7 +377,11 @@ public:
     const std::vector<Member>& getMembers() const;
     const std::vector<Method>& getMethods() const;
 
-    Value generateMemberAccess( Value, const std::string& ) const;
+    // Other operations
+
+    virtual Value generateMemberAccess( Value, const std::string& ) const;
+
+    virtual std::string getName() const;
 
 private:
     std::string _identifier;

@@ -116,7 +116,7 @@ int main( int argc, char **argv ) {
         std::cerr << std::endl;
 
     } catch( std::exception &exception ) {
-        std::cerr << "Exception: " << exception.what();
+        std::cerr << "Internal compiler error: " << exception.what();
     }
 
     std::cin.get();

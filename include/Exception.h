@@ -6,23 +6,34 @@
 
 namespace _8b {
 
-struct NotImplementedError : std::exception {
-    NotImplementedError() : std::exception( "Not implemented" ) {}
+struct Exception : public std::exception {
+    Exception( const std::string &message ) : _message( message ) {}
+
+    virtual const char* what() const {
+        return _message.c_str();
+    }
+private:
+    std::string _message;
 };
 
-struct CompilationError : std::exception {
-    CompilationError( const char *message, SourceLocation sourceLocation )
-        : std::exception( message ), sourceLocation( sourceLocation ) {}
+struct NotImplementedError : public Exception {
+    NotImplementedError() : Exception( "Not implemented" ) {}
+};
+
+struct CompilationError : public Exception {
+    CompilationError(
+        const std::string &message, SourceLocation sourceLocation )
+            : Exception( message ), sourceLocation( sourceLocation ) {}
     SourceLocation sourceLocation;
 };
 
-struct LexicalError : CompilationError {
-    LexicalError( const char *message, SourceLocation sourceLocation )
+struct LexicalError : public CompilationError {
+    LexicalError( const std::string &message, SourceLocation sourceLocation )
         : CompilationError( message, sourceLocation ) {}
 };
 
-struct SyntaxError : CompilationError {
-    SyntaxError( const char *message, SourceLocation sourceLocation )
+struct SyntaxError : public CompilationError {
+    SyntaxError( const std::string &message, SourceLocation sourceLocation )
         : CompilationError( message, sourceLocation ) {}
 };
 

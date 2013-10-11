@@ -2,11 +2,10 @@
 
 #include <list>
 #include <map>
-#include <stdexcept>
-#include <string>
 
 #include <boost/noncopyable.hpp>
 
+#include "Exception.h"
 #include "Value.h"
 
 namespace _8b {
@@ -31,8 +30,8 @@ private:
     std::list< LexicalScope > _scopes;
 };
 
-struct SymbolLookupError : std::exception {
-    SymbolLookupError() : std::exception( "Undeclared identifier" ) {}
+struct SymbolLookupError : public Exception {
+    SymbolLookupError() : Exception( "Undeclared identifier" ) {}
 };
 
 class LexicalScope : boost::noncopyable {

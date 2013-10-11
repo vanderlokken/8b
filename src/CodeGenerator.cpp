@@ -399,7 +399,14 @@ struct CodeGenerator : ast::NodeVisitor {
         for( const auto &argumentExpression : expression->arguments )
             arguments.emplace_back( generate< Value >( argumentExpression ) );
 
-        return value->generateCall( arguments );
+        try {
+            return value->generateCall( arguments );
+
+        } catch( ArgumentTypeError &error ) {
+            // This statement allows to specify exact source location
+            throw CompilationError( error.what(),
+                expression->arguments[error.argumentIndex]->sourceLocation );
+        }
     }
 
     boost::any visit( ast::IdentifierExpression expression ) {
