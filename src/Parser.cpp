@@ -219,7 +219,11 @@ struct Parser : public NodeVisitor {
         case TokenType::KeywordOr:
             return 5;
         case TokenType::OperatorLess:
+        case TokenType::OperatorLessOrEqual:
         case TokenType::OperatorGreater:
+        case TokenType::OperatorGreaterOrEqual:
+        case TokenType::OperatorEqual:
+        case TokenType::OperatorNotEqual:
             return 6;
         case TokenType::OperatorPlus:
         case TokenType::OperatorMinus:
@@ -344,7 +348,13 @@ struct Parser : public NodeVisitor {
             {TokenType::KeywordAnd,       BinaryOperation::LogicAnd},
             {TokenType::KeywordOr,        BinaryOperation::LogicOr},
             {TokenType::OperatorLess,     BinaryOperation::LessComparison},
-            {TokenType::OperatorGreater,  BinaryOperation::GreaterComparison}
+            {TokenType::OperatorGreater,  BinaryOperation::GreaterComparison},
+            {TokenType::OperatorEqual,    BinaryOperation::EqualComparison},
+            {TokenType::OperatorNotEqual, BinaryOperation::NotEqualComparison},
+            {TokenType::OperatorLessOrEqual,
+                BinaryOperation::LessOrEqualComparison},
+            {TokenType::OperatorGreaterOrEqual,
+                BinaryOperation::GreaterOrEqualComparison}
         };
 
         const TokenType tokenType = _lexicalAnalyser.getCurrentToken().type;

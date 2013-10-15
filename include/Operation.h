@@ -22,7 +22,11 @@ enum class BinaryOperation {
     LogicAnd,
     LogicOr,
     LessComparison,
-    GreaterComparison
+    LessOrEqualComparison,
+    GreaterComparison,
+    GreaterOrEqualComparison,
+    EqualComparison,
+    NotEqualComparison
 };
 
 }

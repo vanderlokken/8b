@@ -76,6 +76,7 @@ Token LexicalAnalyser::readToken() {
         { std::regex("<="), TokenType::OperatorLessOrEqual, false },
         { std::regex(">="), TokenType::OperatorGreaterOrEqual, false },
         { std::regex("=="), TokenType::OperatorEqual, false },
+        { std::regex("!="), TokenType::OperatorNotEqual, false },
         { std::regex("\\+\\+"), TokenType::OperatorIncrement, false },
         { std::regex("--"), TokenType::OperatorDecrement, false },
         { std::regex("\\+"), TokenType::OperatorPlus, false },

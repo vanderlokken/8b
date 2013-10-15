@@ -91,7 +91,11 @@ public:
     // Comparison operations
 
     virtual Value generateLessComparison( Value, Value ) const;
+    virtual Value generateLessOrEqualComparison( Value, Value ) const;
     virtual Value generateGreaterComparison( Value, Value ) const;
+    virtual Value generateGreaterOrEqualComparison( Value, Value ) const;
+    virtual Value generateEqualComparison( Value, Value ) const;
+    virtual Value generateNotEqualComparison( Value, Value ) const;
 
     // Conversion operations
 
@@ -166,7 +170,11 @@ public:
     // Comparison operations
 
     virtual Value generateLessComparison( Value, Value ) const;
+    virtual Value generateLessOrEqualComparison( Value, Value ) const;
     virtual Value generateGreaterComparison( Value, Value ) const;
+    virtual Value generateGreaterOrEqualComparison( Value, Value ) const;
+    virtual Value generateEqualComparison( Value, Value ) const;
+    virtual Value generateNotEqualComparison( Value, Value ) const;
 
     // Conversion operations
 
@@ -183,6 +191,7 @@ protected:
     bool isRealSubset() const;
 
     static llvm::Value* convertOperand( Value );
+    static Value generateComparison( llvm::CmpInst::Predicate, Value, Value );
 
     int _bitWidth;
 };
@@ -272,7 +281,11 @@ public:
     // Comparison operations
 
     virtual Value generateLessComparison( Value, Value ) const;
+    virtual Value generateLessOrEqualComparison( Value, Value ) const;
     virtual Value generateGreaterComparison( Value, Value ) const;
+    virtual Value generateGreaterOrEqualComparison( Value, Value ) const;
+    virtual Value generateEqualComparison( Value, Value ) const;
+    virtual Value generateNotEqualComparison( Value, Value ) const;
 
     // Conversion operations
 
@@ -288,6 +301,7 @@ private:
     bool isRealSubset() const;
 
     static llvm::Value* convertOperand( Value );
+    static Value generateComparison( llvm::CmpInst::Predicate, Value, Value );
 
     int _bitWidth;
 };

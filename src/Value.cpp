@@ -111,8 +111,16 @@ Value _Value::generateBinaryOperation(
         return _type->generateLogicOr( first, second );
     case BinaryOperation::LessComparison:
         return _type->generateLessComparison( first, second );
+    case BinaryOperation::LessOrEqualComparison:
+        return _type->generateLessOrEqualComparison( first, second );
     case BinaryOperation::GreaterComparison:
         return _type->generateGreaterComparison( first, second );
+    case BinaryOperation::GreaterOrEqualComparison:
+        return _type->generateGreaterOrEqualComparison( first, second );
+    case BinaryOperation::EqualComparison:
+        return _type->generateEqualComparison( first, second );
+    case BinaryOperation::NotEqualComparison:
+        return _type->generateNotEqualComparison( first, second );
     }
 
     throw NotImplementedError();
@@ -206,7 +214,23 @@ Value _ValueType::generateLessComparison( Value, Value ) const {
     throw SemanticError( "An operation is not implemented" );
 }
 
+Value _ValueType::generateLessOrEqualComparison( Value, Value ) const {
+    throw SemanticError( "An operation is not implemented" );
+}
+
 Value _ValueType::generateGreaterComparison( Value, Value ) const {
+    throw SemanticError( "An operation is not implemented" );
+}
+
+Value _ValueType::generateGreaterOrEqualComparison( Value, Value ) const {
+    throw SemanticError( "An operation is not implemented" );
+}
+
+Value _ValueType::generateEqualComparison( Value, Value ) const {
+    throw SemanticError( "An operation is not implemented" );
+}
+
+Value _ValueType::generateNotEqualComparison( Value, Value ) const {
     throw SemanticError( "An operation is not implemented" );
 }
 
@@ -352,17 +376,30 @@ Value IntegerType::generateDivision( Value first, Value second ) const {
 
 // Comparison operations
 
+// TODO: fix comparisons like '5 < 5.1'
+
 Value IntegerType::generateLessComparison( Value first, Value second ) const {
-    return createBoolean(
-        irBuilder.CreateICmpSLT(convertOperand(first), convertOperand(second))
-    );
+    return generateComparison( llvm::CmpInst::ICMP_SLT, first, second );
 }
 
-Value IntegerType::generateGreaterComparison( Value first, Value second ) const
-{
-    return createBoolean(
-        irBuilder.CreateICmpSGT(convertOperand(first), convertOperand(second))
-    );
+Value IntegerType::generateLessOrEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::ICMP_SLE, first, second );
+}
+
+Value IntegerType::generateGreaterComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::ICMP_SGT, first, second );
+}
+
+Value IntegerType::generateGreaterOrEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::ICMP_SGE, first, second );
+}
+
+Value IntegerType::generateEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::ICMP_EQ, first, second );
+}
+
+Value IntegerType::generateNotEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::ICMP_NE, first, second );
 }
 
 // Conversion operations
@@ -399,6 +436,13 @@ llvm::Value* IntegerType::convertOperand( Value operand ) {
     if( !operand->getType()->isIntegerSubset() )
         throw SemanticError( "An operand is not an integer value" );
     return operand->toInteger()->toLlvm();
+}
+
+Value IntegerType::generateComparison(
+    llvm::CmpInst::Predicate predicate, Value first, Value second )
+{
+    return createBoolean( irBuilder.CreateICmp(
+        predicate, convertOperand(first), convertOperand(second)) );
 }
 
 // ----------------------------------------------------------------------------
@@ -552,15 +596,27 @@ Value RealType::generateDivision( Value first, Value second ) const {
 // Comparison operations
 
 Value RealType::generateLessComparison( Value first, Value second ) const {
-    return createBoolean(
-        irBuilder.CreateFCmpOLT(convertOperand(first), convertOperand(second))
-    );
+    return generateComparison( llvm::CmpInst::FCMP_OLT, first, second );
+}
+
+Value RealType::generateLessOrEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::FCMP_OLE, first, second );
 }
 
 Value RealType::generateGreaterComparison( Value first, Value second ) const {
-    return createBoolean(
-        irBuilder.CreateFCmpOGT(convertOperand(first), convertOperand(second))
-    );
+    return generateComparison( llvm::CmpInst::FCMP_OGT, first, second );
+}
+
+Value RealType::generateGreaterOrEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::FCMP_OGE, first, second );
+}
+
+Value RealType::generateEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::FCMP_OEQ, first, second );
+}
+
+Value RealType::generateNotEqualComparison( Value first, Value second ) const {
+    return generateComparison( llvm::CmpInst::FCMP_ONE, first, second );
 }
 
 // Conversion operations
@@ -593,6 +649,13 @@ llvm::Value* RealType::convertOperand( Value operand ) {
     if( !operand->getType()->isRealSubset() )
         throw SemanticError( "An operand is not a real value" );
     return operand->toReal()->toLlvm();
+}
+
+Value RealType::generateComparison(
+    llvm::CmpInst::Predicate predicate, Value first, Value second )
+{
+    return createBoolean( irBuilder.CreateFCmp(
+        predicate, convertOperand(first), convertOperand(second)) );
 }
 
 // ----------------------------------------------------------------------------
