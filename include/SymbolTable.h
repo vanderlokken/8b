@@ -17,15 +17,15 @@ public:
     void leaveLexicalScope();
 
     void addValue( const std::string&, Value );
-    void addType( const std::string&, ValueType );
+    void addType( const std::string&, Type );
 
     Value lookupValue( const std::string& ) const;
-    ValueType lookupType( const std::string& ) const;
+    Type lookupType( const std::string& ) const;
 
 private:
     struct LexicalScope {
         std::map<std::string, Value> _values;
-        std::map<std::string, ValueType> _types;
+        std::map<std::string, Type> _types;
     };
     std::list< LexicalScope > _scopes;
 };

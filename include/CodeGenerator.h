@@ -1,6 +1,6 @@
 #pragma once
 
-#include <llvm/Module.h>
+#include <llvm/IR/Module.h>
 
 #include "Ast.h"
 

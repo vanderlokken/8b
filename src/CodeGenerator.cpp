@@ -1,18 +1,27 @@
 #include "CodeGenerator.h"
 
-#include <vector>
+#include <boost/optional/optional.hpp>
 
-#include <llvm/Support/IRBuilder.h>
+#include <llvm/IR/IRBuilder.h>
 
 #include "Exception.h"
+#include "Format.h"
 #include "SymbolTable.h"
+#include "types/ClassType.h"
+#include "types/FunctionType.h"
+#include "types/TypeBuilder.h"
 #include "Value.h"
 
 namespace _8b {
 
-extern llvm::IRBuilder<> irBuilder( llvm::getGlobalContext() );
-
 struct CodeGenerator : ast::NodeVisitor {
+
+    CodeGenerator() :
+        irBuilder( llvm::getGlobalContext() ),
+        _typeBuilder( irBuilder ),
+        _currentModule( nullptr ),
+        _currentFunction( nullptr )
+    {}
 
     // This function runs an appropriate code generation routine for the
     // specified ast::Node object and returns the result of the specified type
@@ -25,6 +34,8 @@ struct CodeGenerator : ast::NodeVisitor {
             return node->acceptVisitor( this );
 
         } catch( SemanticError &error ) {
+            throw CompilationError( error.what(), node->sourceLocation );
+        } catch( NotImplementedError &error ) {
             throw CompilationError( error.what(), node->sourceLocation );
         }
     }
@@ -59,11 +70,11 @@ struct CodeGenerator : ast::NodeVisitor {
                 throw NotImplementedError();
 
             members.emplace_back( declaration->identifier,
-                generate< ValueType >( declaration->type ) );
+                generate< Type >( declaration->type ) );
         }
 
         auto classType = std::make_shared< ClassType >(
-            classDeclaration->identifier, members );
+            classDeclaration->identifier, members, _typeBuilder );
 
         _symbolTable.addType( classDeclaration->identifier, classType );
 
@@ -82,52 +93,53 @@ struct CodeGenerator : ast::NodeVisitor {
         return boost::any();
     }
 
-    ValueType generateFunctionType(
-        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+    Type generateFunctionType(
+        ast::FunctionDeclaration declaration, Type classType = nullptr )
     {
-        std::vector< FunctionType::Argument > arguments;
-        arguments.reserve( declaration->arguments.size() );
+        std::vector< Type > argumentTypes;
+        argumentTypes.reserve( declaration->arguments.size() );
 
         if( classType )
-            arguments.emplace_back( "instance", PointerType::get(classType) );
+            argumentTypes.emplace_back(
+                _typeBuilder.getPointerType(classType) );
 
         for( auto &argument : declaration->arguments )
-            arguments.emplace_back(
-                argument->identifier, generate< ValueType >( argument->type ) );
+            argumentTypes.emplace_back( generate< Type >( argument->type ) );
 
-        ValueType returnType;
+        Type returnType;
 
         if( declaration->returnType )
-            returnType = generate< ValueType >( declaration->returnType );
+            returnType = generate< Type >( declaration->returnType );
 
-        return std::make_shared< FunctionType >( arguments, returnType );
+        return std::make_shared< FunctionType >(
+            argumentTypes, returnType, _typeBuilder );
     }
 
     static std::string generateFunctionIdentifier(
-        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+        ast::FunctionDeclaration declaration, Type classType = nullptr )
     {
         if( !classType )
             return declaration->identifier;
 
-        return std::static_pointer_cast< ClassType >(classType)->
+        return std::static_pointer_cast< const ClassType >(classType)->
             getIdentifier() + "." + declaration->identifier;
     }
 
     Value generateFunctionHeader(
-        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+        ast::FunctionDeclaration declaration, Type classType = nullptr )
     {
-        ValueType type = generateFunctionType( declaration, classType );
+        Type type = generateFunctionType( declaration, classType );
 
-        llvm::FunctionType *llvmType =
-            static_cast< llvm::FunctionType* >( type->toLlvm() );
+        llvm::FunctionType *rawType =
+            static_cast< llvm::FunctionType* >( type->getRaw() );
 
         std::string identifier =
             generateFunctionIdentifier( declaration, classType );
 
-        llvm::Function *functionValue = llvm::Function::Create( llvmType,
+        llvm::Function *rawValue = llvm::Function::Create( rawType,
             llvm::Function::ExternalLinkage, identifier, _currentModule );
 
-        Value value = _Value::createSsaValue( type, functionValue );
+        Value value = type->createValue( rawValue );
         _symbolTable.addValue( identifier, value );
 
         // Add a task to generate function implementation later
@@ -137,7 +149,7 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     void generateFunctionImplementation(
-        ast::FunctionDeclaration declaration, ValueType classType = nullptr )
+        ast::FunctionDeclaration declaration, Type classType = nullptr )
     {
         std::string identifier =
             generateFunctionIdentifier( declaration, classType );
@@ -145,29 +157,27 @@ struct CodeGenerator : ast::NodeVisitor {
         auto value = _symbolTable.lookupValue( identifier );
         auto type = value->getType();
 
-        _currentFunction = static_cast< llvm::Function* >( value->toLlvm() );
+        _currentFunction = static_cast< llvm::Function* >( value->getRaw() );
 
         // Add function arguments to the symbol table
         LexicalScope lexicalScope( _symbolTable );
 
-        size_t argumentIndex = 0;
+        const std::vector<Type> &argumentTypes = std::static_pointer_cast<
+            const FunctionType >( type )->getArgumentTypes();
 
-        for( const auto &argument :
-                std::static_pointer_cast< FunctionType >(type)->getArguments() )
-        {
+        for( size_t index = 0; index < argumentTypes.size(); ++index ) {
             auto argumentIterator = _currentFunction->arg_begin();
-            std::advance( argumentIterator, argumentIndex );
+            std::advance( argumentIterator, index );
+            llvm::Value *rawArgumentValue = argumentIterator;
 
-            llvm::Value *llvmArgumentValue = argumentIterator;
-
-            if( classType && argumentIndex == 0 )
-                _symbolTable.addValue( "instance",
-                    _Value::createReference(classType, llvmArgumentValue) );
+            if( classType && index == 0 )
+                _symbolTable.addValue( "instance", _Value::createIndirect(
+                    rawArgumentValue, classType, irBuilder, "instance") );
             else
-                _symbolTable.addValue( argument.identifier,
-                    _Value::createSsaValue(argument.type, llvmArgumentValue) );
-
-            argumentIndex++;
+                _symbolTable.addValue(
+                   declaration->arguments[
+                        index - (classType ? 1 : 0)]->identifier,
+                   argumentTypes[index]->createValue(rawArgumentValue) );
         }
 
         generateBlock( declaration->block );
@@ -254,9 +264,8 @@ struct CodeGenerator : ast::NodeVisitor {
         end->moveAfter( falseBranch );
 
         irBuilder.SetInsertPoint( previous );
-        Value condition =
-            generate< Value >( statement->condition )->toBoolean();
-        irBuilder.CreateCondBr( condition->toLlvm(), trueBranch, falseBranch );
+        Value condition = toBoolean( statement->condition );
+        irBuilder.CreateCondBr( condition->getRaw(), trueBranch, falseBranch );
 
         createBranchIfNeeded( trueBranch, end );
         createBranchIfNeeded( falseBranch, end );
@@ -272,7 +281,7 @@ struct CodeGenerator : ast::NodeVisitor {
     boost::any visit( ast::ReturnStatement statement ) {
         if( statement->expression )
             irBuilder.CreateRet(
-                generate< Value >( statement->expression )->toLlvm() );
+                generate< Value >( statement->expression )->getRaw() );
         else
             irBuilder.CreateRetVoid();
         return boost::any();
@@ -280,21 +289,17 @@ struct CodeGenerator : ast::NodeVisitor {
 
     boost::any visit( ast::VariableDeclaration declaration ) {
 
-        Value variable;
+        Value initializerValue;
+        Type type;
 
         if( declaration->type ) {
 
-            auto type = generate< ValueType >( declaration->type );
-            variable = _Value::createVariable( type, declaration->identifier );
+            type = generate< Type >( declaration->type );
 
         } else if( declaration->initializer ) {
 
-            Value initializerValue =
-                generate< Value >( declaration->initializer );
-            variable = _Value::createVariable(
-                initializerValue->getType(), declaration->identifier );
-            variable->generateBinaryOperation(
-                BinaryOperation::Assignment, initializerValue );
+            initializerValue = generate< Value >( declaration->initializer );
+            type = initializerValue->getType();
 
         } else {
             throw CompilationError(
@@ -302,6 +307,14 @@ struct CodeGenerator : ast::NodeVisitor {
                 "identifier nor initializer expression",
                 declaration->sourceLocation );
         }
+
+        llvm::Value *rawValue = irBuilder.CreateAlloca( type->getRaw() );
+        Value variable = _Value::createIndirect(
+            rawValue, type, irBuilder, declaration->identifier );
+
+        if( initializerValue )
+            type->generateBinaryOperatorCall( _typeBuilder,
+                _Type::Operator::Assign, variable, initializerValue );
 
         _symbolTable.addValue( declaration->identifier, variable );
 
@@ -323,9 +336,8 @@ struct CodeGenerator : ast::NodeVisitor {
         irBuilder.CreateBr( start );
 
         irBuilder.SetInsertPoint( start );
-        Value condition =
-            generate< Value >( statement->condition )->toBoolean();
-        irBuilder.CreateCondBr( condition->toLlvm(), loop, end );
+        Value condition = toBoolean( statement->condition );
+        irBuilder.CreateCondBr( condition->getRaw(), loop, end );
 
         createBranchIfNeeded( loop, start );
 
@@ -338,17 +350,7 @@ struct CodeGenerator : ast::NodeVisitor {
     //  Expressions
     // ------------------------------------------------------------------------
 
-    boost::any visit( ast::BinaryOperationExpression expression ) {
-        const BinaryOperation operation = expression->operation;
-
-        if( operation != BinaryOperation::LogicAnd &&
-            operation != BinaryOperation::LogicOr )
-        {
-            auto leftValue = generate< Value >( expression->leftOperand );
-            auto rightValue = generate< Value >( expression->rightOperand );
-            return leftValue->generateBinaryOperation( operation, rightValue );
-        }
-
+    Value generateLogicOperation( ast::BinaryOperationExpression expression ) {
         // The following code implements specific operand evaluation for the
         // BinaryOperation::LogicAnd and BinaryOperation::LogicOr
 
@@ -356,17 +358,17 @@ struct CodeGenerator : ast::NodeVisitor {
         llvm::BasicBlock *evaluateRight = createBasicBlock();
         llvm::BasicBlock *end = createBasicBlock();
 
-        llvm::Value *leftValue = generate< Value >(
-            expression->leftOperand )->toBoolean()->toLlvm();
+        llvm::Value *leftValue =
+            toBoolean( expression->leftOperand )->getRaw();
 
-        if( operation == BinaryOperation::LogicAnd )
+        if( expression->operation == BinaryOperation::LogicAnd )
             irBuilder.CreateCondBr( leftValue, evaluateRight, end );
         else // operation == BinaryOperation::LogicOr
             irBuilder.CreateCondBr( leftValue, end, evaluateRight );
 
         irBuilder.SetInsertPoint( evaluateRight );
-        llvm::Value *rightValue = generate< Value >(
-            expression->rightOperand )->toBoolean()->toLlvm();
+        llvm::Value *rightValue =
+            toBoolean( expression->rightOperand )->getRaw();
         irBuilder.CreateBr( end );
 
         irBuilder.SetInsertPoint( end );
@@ -376,18 +378,96 @@ struct CodeGenerator : ast::NodeVisitor {
         llvm::PHINode *resultValue =
             irBuilder.CreatePHI( irBuilder.getInt1Ty(), incomingBranchCount );
 
-        if( operation == BinaryOperation::LogicAnd )
+        if( expression->operation == BinaryOperation::LogicAnd )
             resultValue->addIncoming( irBuilder.getFalse(), current );
         else // operation == BinaryOperation::LogicOr
             resultValue->addIncoming( irBuilder.getTrue(), current );
 
         resultValue->addIncoming( rightValue, evaluateRight );
 
-        return _Value::createSsaValue( BooleanType::get(), resultValue );
+        return _typeBuilder.getBooleanType()->createValue( resultValue );
+    }
+
+    boost::any visit( ast::BinaryOperationExpression expression ) {
+        _Type::Operator operator_;
+        boost::optional<_Type::Operator> reverseOperator;
+
+        switch( expression->operation ) {
+        case BinaryOperation::LogicAnd:
+        case BinaryOperation::LogicOr:
+            return generateLogicOperation( expression );
+        case BinaryOperation::Assignment:
+            operator_ = _Type::Operator::Assign;
+            break;
+        case BinaryOperation::Addition:
+            operator_ = _Type::Operator::Add;
+            reverseOperator = _Type::Operator::AddRight;
+            break;
+        case BinaryOperation::Subtraction:
+            operator_ = _Type::Operator::Subtract;
+            reverseOperator = _Type::Operator::SubtractRight;
+            break;
+        case BinaryOperation::Multiplication:
+            operator_ = _Type::Operator::Multiply;
+            reverseOperator = _Type::Operator::MultiplyRight;
+            break;
+        case BinaryOperation::Division:
+            operator_ = _Type::Operator::Divide;
+            reverseOperator = _Type::Operator::DivideRight;
+            break;
+        case BinaryOperation::LessComparison:
+            operator_ = _Type::Operator::Less;
+            reverseOperator = _Type::Operator::Greater;
+            break;
+        case BinaryOperation::LessOrEqualComparison:
+            operator_ = _Type::Operator::LessOrEqual;
+            reverseOperator = _Type::Operator::GreaterOrEqual;
+            break;
+        case BinaryOperation::GreaterComparison:
+            operator_ = _Type::Operator::Greater;
+            reverseOperator = _Type::Operator::Less;
+            break;
+        case BinaryOperation::GreaterOrEqualComparison:
+            operator_ = _Type::Operator::GreaterOrEqual;
+            reverseOperator = _Type::Operator::LessOrEqual;
+            break;
+        case BinaryOperation::EqualComparison:
+            operator_ = _Type::Operator::Equal;
+            reverseOperator = _Type::Operator::Equal;
+            break;
+        case BinaryOperation::NotEqualComparison:
+            operator_ = _Type::Operator::NotEqual;
+            reverseOperator = _Type::Operator::NotEqual;
+            break;
+        default:
+            throw NotImplementedError();
+        }
+
+        auto leftValue = generate< Value >( expression->leftOperand );
+        auto rightValue = generate< Value >( expression->rightOperand );
+
+        auto result = leftValue->getType()->generateBinaryOperatorCall(
+            _typeBuilder, operator_, leftValue, rightValue );
+
+        if( result )
+            return result;
+
+        if( reverseOperator ) {
+
+            auto result = rightValue->getType()->generateBinaryOperatorCall(
+                _typeBuilder, *reverseOperator, rightValue, leftValue );
+
+            if( result )
+                return result;
+        }
+
+        throw CompilationError(
+            "No suitable binary operator found", expression->sourceLocation );
     }
 
     boost::any visit( ast::BooleanConstant constant ) {
-        return _Value::createBooleanConstant( constant->value );
+        return _typeBuilder.getBooleanType()->createValue(
+            irBuilder.getInt1(constant->value) );
     }
 
     boost::any visit( ast::CallExpression expression ) {
@@ -399,14 +479,14 @@ struct CodeGenerator : ast::NodeVisitor {
         for( const auto &argumentExpression : expression->arguments )
             arguments.emplace_back( generate< Value >( argumentExpression ) );
 
-        try {
-            return value->generateCall( arguments );
+        Value result = value->getType()->generateGeneralOperatorCall(
+            _typeBuilder, _Type::Operator::Call, value, arguments );
 
-        } catch( ArgumentTypeError &error ) {
-            // This statement allows to specify exact source location
-            throw CompilationError( error.what(),
-                expression->arguments[error.argumentIndex]->sourceLocation );
-        }
+        if( result )
+            return result;
+        else
+            throw CompilationError( "No suitable call operator found",
+                expression->sourceLocation );
     }
 
     boost::any visit( ast::IdentifierExpression expression ) {
@@ -430,22 +510,66 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::IntegerConstant constant ) {
-        return _Value::createIntegerConstant( constant->value );
+        return _typeBuilder.getIntegerType()->createValue(
+            irBuilder.getInt32(constant->value) );
     }
 
     boost::any visit( ast::MemberAccessExpression expression ) {
-        auto value = generate< Value >( expression->object );
-        return value->generateMemberAccess(
-            expression->memberIdentifier );
+        Value value = generate< Value >( expression->object );
+
+        Value result = value->getType()->generateMemberAccess(
+            _typeBuilder, value, expression->memberIdentifier );
+
+        if( result )
+            return result;
+        else
+            throw CompilationError(
+                format("A value of type '%1%' has no member '%2%'",
+                    value->getType()->getName(), expression->memberIdentifier),
+                expression->sourceLocation );
     }
 
     boost::any visit( ast::StringConstant constant ) {
-        return _Value::createStringConstant( constant->value );
+        throw NotImplementedError();
     }
 
     boost::any visit( ast::UnaryOperationExpression expression ) {
         auto value = generate< Value >( expression->operand );
-        return value->generateUnaryOperation( expression->operation );
+        Type type = value->getType();
+
+        Value result;
+
+        switch( expression->operation ) {
+        case UnaryOperation::Increment:
+            result = type->generateUnaryOperatorCall(
+                _typeBuilder, _Type::Operator::Increment, value );
+            break;
+        case UnaryOperation::Decrement:
+            result = type->generateUnaryOperatorCall(
+                _typeBuilder, _Type::Operator::Decrement, value );
+            break;
+        case UnaryOperation::BooleanConversion:
+            result = type->generateUnaryOperatorCall(
+                _typeBuilder, _Type::Operator::ToBoolean, value );
+            break;
+        case UnaryOperation::PointerConversion:
+            result = _typeBuilder.getPointerType( type )->createValue(
+                value->getRawPointer() );
+            break;
+        default:
+            throw NotImplementedError();
+        }
+
+        if( result )
+            return result;
+
+        if( expression->operation == UnaryOperation::BooleanConversion )
+            throw CompilationError(
+                "A boolean conversion operator is not implemented",
+                expression->sourceLocation );
+        else
+            throw CompilationError( "No suitable unary operator found",
+                expression->sourceLocation );
     }
 
     // ------------------------------------------------------------------------
@@ -453,11 +577,11 @@ struct CodeGenerator : ast::NodeVisitor {
     // ------------------------------------------------------------------------
 
     boost::any visit( ast::BooleanType ) {
-        return BooleanType::get();
+        return _typeBuilder.getBooleanType();
     }
 
     boost::any visit( ast::IntegerType ) {
-        return IntegerType::get();
+        return _typeBuilder.getIntegerType();
     }
 
     boost::any visit( ast::NamedType namedType ) {
@@ -471,17 +595,16 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::PointerType pointerType ) {
-        auto type = PointerType::get(
-            generate< ValueType >( pointerType->targetType ) );
-        return std::static_pointer_cast< _ValueType >( type );
+        return _typeBuilder.getPointerType(
+            generate< Type >( pointerType->targetType ) );
     }
 
     boost::any visit( ast::RealType ) {
-        return RealType::get();
+        return _typeBuilder.getRealType();
     }
 
     boost::any visit( ast::StringType ) {
-        return StringType::get();
+        throw NotImplementedError();
     }
 
     // ------------------------------------------------------------------------
@@ -500,6 +623,27 @@ struct CodeGenerator : ast::NodeVisitor {
         }
     }
 
+    Value toBoolean( ast::Expression expression ) {
+        Value value = generate< Value >( expression );
+
+        if( value->isInstanceOf(_typeBuilder.getBooleanType()) )
+            return value;
+
+        Value result = value->getType()->generateUnaryOperatorCall(
+            _typeBuilder, _Type::Operator::ToBoolean, value );
+
+        if( result )
+            return result;
+        else
+            throw CompilationError(
+                "A boolean conversion operator is not implemented",
+                expression->sourceLocation );
+    }
+
+    llvm::IRBuilder<> irBuilder;
+
+    TypeBuilder _typeBuilder;
+
     SymbolTable _symbolTable;
 
     llvm::Module *_currentModule;
@@ -507,11 +651,11 @@ struct CodeGenerator : ast::NodeVisitor {
 
     struct FunctionGenerationTask {
         FunctionGenerationTask(
-                ast::FunctionDeclaration declaration, ValueType classType )
+                ast::FunctionDeclaration declaration, Type classType )
             : declaration( declaration ), classType( classType ) {}
 
         ast::FunctionDeclaration declaration;
-        ValueType classType;
+        Type classType;
     };
 
     std::vector< FunctionGenerationTask > _functionGenerationTasks;

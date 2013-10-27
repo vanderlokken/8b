@@ -14,7 +14,7 @@ void SymbolTable::addValue( const std::string &name, Value value ) {
     _scopes.begin()->_values[name] = value;
 }
 
-void SymbolTable::addType( const std::string &name, ValueType type ) {
+void SymbolTable::addType( const std::string &name, Type type ) {
     _scopes.begin()->_types[name] = type;
 }
 
@@ -27,7 +27,7 @@ Value SymbolTable::lookupValue( const std::string &name ) const {
     throw SymbolLookupError();
 }
 
-ValueType SymbolTable::lookupType( const std::string &name ) const {
+Type SymbolTable::lookupType( const std::string &name ) const {
     for( const auto &scope : _scopes ) {
         auto it = scope._types.find( name );
         if( it != scope._types.end() )

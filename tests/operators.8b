@@ -1,0 +1,98 @@
+class Test {
+    function check( value boolean ) {
+        if( value ) {
+            # Do nothing
+        } else {
+            instance.errorCount++;
+        }
+    }
+
+    function checkIntegerOperators() {
+        instance.check( 1 + 1 == 2 );
+        instance.check( 2 - 1 == 1 );
+        instance.check( 2 * 2 == 4 );
+        instance.check( 4 / 2 == 2 );
+        instance.check( 1 and true );
+        instance.check( 2 < 3 );
+        instance.check( 2 <= 3 and 2 <= 2 );
+        instance.check( 3 > 2 );
+        instance.check( 3 >= 2 and 3 >= 3 );
+        instance.check( 2 == 2 );
+        instance.check( 3 != 2 );
+
+        # Check assignment
+        variable value = 0;
+        value = 2;
+        instance.check( value == 2 );
+        value++;
+        instance.check( value == 3 );
+        value--;
+        instance.check( value == 2 );
+
+        # Check implicit type conversion
+        instance.check( 1 + true == 2 );
+        instance.check( 2 > true );
+    }
+
+    function checkRealOperators() {
+        variable one real;
+        one = one - one + 1;
+
+        variable half = one / 2;
+
+        instance.check( half + half == one );
+        instance.check( one - half == half );
+        instance.check( one * half == half );
+        instance.check( one / 2 == half );
+        instance.check( half and true );
+        instance.check( half < one );
+        instance.check( half <= one and half <= half );
+        instance.check( one > half );
+        instance.check( one >= half and one >= one );
+        instance.check( half == half );
+        instance.check( half != one );
+
+        # Check assignment
+        one++;
+        instance.check( one == 2 );
+        one--;
+        instance.check( one == 1 );
+
+        # Check implicit type conversion
+        instance.check( 1 + one == 2 );
+        instance.check( true + one == 2 );
+        instance.check( 1 > half );
+    }
+
+    function checkPointerOperators() {
+        variable target = 1;
+        variable value = pointerTo( target );
+
+        # Check boolean conversion
+        instance.check( value and true );
+
+        # Check target access
+        value.target++;
+        instance.check( value.target == 2 );
+
+        # Check assignment
+        variable anotherTarget = 4;
+        value = pointerTo( anotherTarget );
+        instance.check( value.target == 4 );
+    }
+
+    function run() {
+        instance.checkIntegerOperators();
+        instance.checkRealOperators();
+        instance.checkPointerOperators();
+    }
+
+    variable errorCount integer;
+}
+
+function main() integer {
+    variable test Test;
+    test.errorCount = 0;
+    test.run();
+    return test.errorCount;
+}

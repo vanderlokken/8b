@@ -1,407 +1,75 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
-#include <llvm/Value.h>
+#include <llvm/IR/IRBuilder.h>
 
 #include "Exception.h"
-#include "Operation.h"
 
 namespace _8b {
 
-
-struct SemanticError : public Exception {
-    SemanticError( const std::string& message ) : Exception( message ) {}
-};
-
-struct ArgumentTypeError : public SemanticError {
-    ArgumentTypeError( const std::string& message, size_t argumentIndex )
-        : SemanticError( message ), argumentIndex( argumentIndex ) {}
-    size_t argumentIndex;
-};
-
-
 class _Value;
-typedef std::shared_ptr<const _Value> Value;
+class _Type;
 
-class _ValueType;
-typedef std::shared_ptr<_ValueType> ValueType;
+typedef std::shared_ptr<_Value> Value;
+typedef std::shared_ptr<const _Type> Type;
 
-
-class _Value : public std::enable_shared_from_this<_Value> {
+class _Value {
 public:
 
-    static Value createVariable( ValueType type, const std::string &identifier );
-    static Value createReference( ValueType type, llvm::Value* );
-    static Value createSsaValue( ValueType type, llvm::Value* );
-    static Value createUnusableValue();
-    static Value createIntegerConstant( int );
-    static Value createBooleanConstant( bool );
-    static Value createStringConstant( const std::string& );
+    typedef std::function<llvm::Value* (llvm::Value*)> Dereference;
 
-    _Value( ValueType type, llvm::Value *llvmValue, bool assignable )
-        : _type( type ), _llvmValue( llvmValue ), _assignable( assignable ) {}
-
-    ValueType getType() const;
-    llvm::Value* toLlvm() const;
-    llvm::Value* toLlvmPointer() const;
-
-    bool isAssignable() const;
-
-    Value generateBinaryOperation( BinaryOperation, Value ) const;
-    Value generateUnaryOperation( UnaryOperation ) const;
-    Value generateCall( const std::vector<Value>& ) const;
-    Value generateMemberAccess( const std::string &memberIdentifier ) const;
-
-    Value toBoolean() const;
-    Value toInteger() const;
-    Value toReal() const;
-
-protected:
-    ValueType _type;
-    llvm::Value *_llvmValue;
-    bool _assignable;
-};
-
-// ----------------------------------------------------------------------------
-//  _ValueType
-// ----------------------------------------------------------------------------
-
-class _ValueType {
-public:
-    virtual ~_ValueType() {}
-
-    virtual llvm::Type* toLlvm() const;
-
-    // Assignment operations
-
-    virtual Value generateAssignment( Value, Value ) const;
-    virtual Value generateIncrement( Value ) const;
-    virtual Value generateDecrement( Value ) const;
-
-    // Arithmetic operations
-
-    virtual Value generateAddition( Value, Value ) const;
-    virtual Value generateSubtraction( Value, Value ) const;
-    virtual Value generateMultiplication( Value, Value ) const;
-    virtual Value generateDivision( Value, Value ) const;
-
-    // Comparison operations
-
-    virtual Value generateLessComparison( Value, Value ) const;
-    virtual Value generateLessOrEqualComparison( Value, Value ) const;
-    virtual Value generateGreaterComparison( Value, Value ) const;
-    virtual Value generateGreaterOrEqualComparison( Value, Value ) const;
-    virtual Value generateEqualComparison( Value, Value ) const;
-    virtual Value generateNotEqualComparison( Value, Value ) const;
-
-    // Conversion operations
-
-    virtual Value generateBooleanConversion( Value ) const;
-    virtual Value generateIntegerConversion( Value ) const;
-    virtual Value generateRealConversion( Value ) const;
-
-    // Logic operations
-
-    Value generateLogicAnd( Value, Value ) const;
-    Value generateLogicOr( Value, Value ) const;
-
-    // Other operations
-
-    virtual Value generateCall( Value, const std::vector<Value>& ) const;
-    virtual Value generateMemberAccess( Value, const std::string& ) const;
-
-    Value generatePointerConversion( Value ) const;
-
-    virtual bool isIntegerSubset() const;
-    virtual bool isRealSubset() const;
-
-    virtual std::string getName() const = 0;
-
-protected:
-    static Value createUnusable( llvm::Value* );
-    static Value createBoolean( llvm::Value* );
-    static Value createInteger( llvm::Value* );
-    static Value createReal( llvm::Value* );
-
-    llvm::Type *_type;
-};
-
-// ----------------------------------------------------------------------------
-//  UnusableType
-// ----------------------------------------------------------------------------
-
-class UnusableType : public _ValueType {
-public:
-    virtual std::string getName() const { return "\"not a value\""; }
-
-    static ValueType get() {
-        static const ValueType instance = std::make_shared< UnusableType >();
-        return instance;
+    static Value create(
+        llvm::Value *rawValue, Type type, const std::string &identifier = "" )
+    {
+        if( !identifier.empty() )
+            rawValue->setName( identifier );
+        return std::make_shared<_Value>( rawValue, type );
     }
-};
 
-// ----------------------------------------------------------------------------
-//  IntegerType
-// ----------------------------------------------------------------------------
+    static Value createIndirect(
+        llvm::Value *rawValue, Type type,
+        llvm::IRBuilder<> &irBuilder, const std::string &identifier = "" )
+    {
+        if( !identifier.empty() )
+            rawValue->setName( identifier );
+        auto dereference = [&irBuilder] (llvm::Value *value) {
+            return irBuilder.CreateLoad( value );
+        };
+        return std::make_shared<_Value>( rawValue, type, dereference );
+    }
 
-class IntegerType : public _ValueType {
-public:
+    _Value( llvm::Value *rawValue, Type type, Dereference dereference = nullptr )
+        : _rawValue( rawValue ), _type( type ), _dereference( dereference ) {}
 
-    IntegerType( int bitWidth );
+    Type getType() const {
+        return _type;
+    }
 
-    static ValueType get( int bitWidth = 32 );
+    llvm::Value* getRaw() const {
+        return _dereference ? _dereference( _rawValue ) : _rawValue;
+    }
 
-    // Assignment operations
+    llvm::Value* getRawPointer() const {
+        if( !_dereference )
+            throw SemanticError( "Cannot reference a temporary value" );
+        return _rawValue;
+    }
 
-    virtual Value generateAssignment( Value, Value ) const;
-    virtual Value generateIncrement( Value ) const;
-    virtual Value generateDecrement( Value ) const;
+    bool isIndirect() const {
+        return _dereference != nullptr;
+    }
 
-    // Arithmetic operations
-
-    virtual Value generateAddition( Value, Value ) const;
-    virtual Value generateSubtraction( Value, Value ) const;
-    virtual Value generateMultiplication( Value, Value ) const;
-    virtual Value generateDivision( Value, Value ) const;
-
-    // Comparison operations
-
-    virtual Value generateLessComparison( Value, Value ) const;
-    virtual Value generateLessOrEqualComparison( Value, Value ) const;
-    virtual Value generateGreaterComparison( Value, Value ) const;
-    virtual Value generateGreaterOrEqualComparison( Value, Value ) const;
-    virtual Value generateEqualComparison( Value, Value ) const;
-    virtual Value generateNotEqualComparison( Value, Value ) const;
-
-    // Conversion operations
-
-    virtual Value generateBooleanConversion( Value ) const;
-    virtual Value generateIntegerConversion( Value ) const;
-    virtual Value generateRealConversion( Value ) const;
-
-    // Other operations
-
-    virtual std::string getName() const;
+    bool isInstanceOf( Type type ) const {
+        return _type == type;
+    }
 
 protected:
-    bool isIntegerSubset() const;
-    bool isRealSubset() const;
-
-    static llvm::Value* convertOperand( Value );
-    static Value generateComparison( llvm::CmpInst::Predicate, Value, Value );
-
-    int _bitWidth;
+    llvm::Value *_rawValue;
+    Type _type;
+    Dereference _dereference;
 };
-
-// ----------------------------------------------------------------------------
-//  BooleanType
-// ----------------------------------------------------------------------------
-
-class BooleanType : public IntegerType {
-public:
-
-    BooleanType();
-
-    static ValueType get();
-
-    // Assignment operations
-
-    virtual Value generateAssignment( Value, Value ) const;
-    virtual Value generateIncrement( Value ) const;
-    virtual Value generateDecrement( Value ) const;
-
-    // Conversion operations
-
-    virtual Value generateBooleanConversion( Value ) const;
-    virtual Value generateIntegerConversion( Value ) const;
-    virtual Value generateRealConversion( Value ) const;
-
-    // Other operations
-
-    virtual std::string getName() const;
-};
-
-// ----------------------------------------------------------------------------
-//  PointerType
-// ----------------------------------------------------------------------------
-
-class PointerType : public _ValueType {
-public:
-
-    static ValueType get( ValueType targetType );
-
-    PointerType( ValueType targetType );
-
-    ValueType getTargetType() const;
-
-    // Assignment operations
-
-    virtual Value generateAssignment( Value, Value ) const;
-
-    // Conversion operations
-
-    virtual Value generateBooleanConversion( Value ) const;
-    virtual Value generateIntegerConversion( Value ) const;
-
-    // Other operations
-
-    virtual Value generateMemberAccess( Value, const std::string& ) const;
-
-    virtual std::string getName() const;
-
-private:
-    ValueType _targetType;
-};
-
-// ----------------------------------------------------------------------------
-//  RealType
-// ----------------------------------------------------------------------------
-
-class RealType : public _ValueType {
-public:
-
-    RealType( int bitWidth );
-
-    static ValueType get( int bitWidth = 32 );
-
-    // Assignment operations
-
-    virtual Value generateAssignment( Value, Value ) const;
-
-    // Arithmetic operations
-
-    virtual Value generateAddition( Value, Value ) const;
-    virtual Value generateSubtraction( Value, Value ) const;
-    virtual Value generateMultiplication( Value, Value ) const;
-    virtual Value generateDivision( Value, Value ) const;
-
-    // Comparison operations
-
-    virtual Value generateLessComparison( Value, Value ) const;
-    virtual Value generateLessOrEqualComparison( Value, Value ) const;
-    virtual Value generateGreaterComparison( Value, Value ) const;
-    virtual Value generateGreaterOrEqualComparison( Value, Value ) const;
-    virtual Value generateEqualComparison( Value, Value ) const;
-    virtual Value generateNotEqualComparison( Value, Value ) const;
-
-    // Conversion operations
-
-    virtual Value generateBooleanConversion( Value ) const;
-    virtual Value generateIntegerConversion( Value ) const;
-    virtual Value generateRealConversion( Value ) const;
-
-    // Other operations
-
-    virtual std::string getName() const;
-
-private:
-    bool isRealSubset() const;
-
-    static llvm::Value* convertOperand( Value );
-    static Value generateComparison( llvm::CmpInst::Predicate, Value, Value );
-
-    int _bitWidth;
-};
-
-// ----------------------------------------------------------------------------
-//  StringType
-// ----------------------------------------------------------------------------
-
-class StringType : public _ValueType {
-public:
-
-    StringType();
-
-    static ValueType get();
-
-    // Other operations
-
-    virtual Value generateMemberAccess( Value, const std::string& ) const;
-
-    virtual std::string getName() const;
-};
-
-// ----------------------------------------------------------------------------
-//  FunctionType
-// ----------------------------------------------------------------------------
-
-class FunctionType : public _ValueType {
-public:
-
-    struct Argument {
-
-        Argument( const std::string &identifier, ValueType type )
-            : identifier( identifier ), type( type ) {}
-
-        std::string identifier;
-        ValueType type;
-    };
-
-    FunctionType(
-        const std::vector<Argument>&, ValueType returnType = nullptr );
-
-    const std::vector<Argument>& getArguments() const;
-    ValueType getReturnType() const;
-
-    // Other operations
-
-    virtual Value generateCall( Value, const std::vector<Value>& ) const;
-
-    virtual std::string getName() const;
-
-private:
-    std::vector<Argument> _arguments;
-    ValueType _returnType;
-};
-
-// ----------------------------------------------------------------------------
-//  ClassType
-// ----------------------------------------------------------------------------
-
-class ClassType : public _ValueType {
-public:
-
-    struct Member {
-
-        Member( const std::string &identifier, ValueType type )
-            : identifier( identifier ), type( type ) {}
-
-        std::string identifier;
-        ValueType type;
-    };
-
-    struct Method {
-
-        Method( const std::string &identifier, Value value )
-            : identifier( identifier ), value( value ) {}
-
-        std::string identifier;
-        Value value;
-    };
-
-    ClassType(
-        const std::string &identifier, const std::vector<Member> &members );
-
-    void addMethod( const std::string&, Value );
-
-    const std::string& getIdentifier() const;
-    const std::vector<Member>& getMembers() const;
-    const std::vector<Method>& getMethods() const;
-
-    // Other operations
-
-    virtual Value generateMemberAccess( Value, const std::string& ) const;
-
-    virtual std::string getName() const;
-
-private:
-    std::string _identifier;
-    std::vector< Member > _members;
-    std::vector< Method > _methods;
-};
-
 
 }

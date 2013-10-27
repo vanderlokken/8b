@@ -37,4 +37,9 @@ struct SyntaxError : public CompilationError {
         : CompilationError( message, sourceLocation ) {}
 };
 
+// When exceptions of this type are thrown a source location is not known.
+struct SemanticError : public Exception {
+    SemanticError( const std::string &message ) : Exception( message ) {}
+};
+
 }
