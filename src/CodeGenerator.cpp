@@ -354,12 +354,12 @@ struct CodeGenerator : ast::NodeVisitor {
         // The following code implements specific operand evaluation for the
         // BinaryOperation::LogicAnd and BinaryOperation::LogicOr
 
-        llvm::BasicBlock *current = irBuilder.GetInsertBlock();
         llvm::BasicBlock *evaluateRight = createBasicBlock();
         llvm::BasicBlock *end = createBasicBlock();
 
         llvm::Value *leftValue =
             toBoolean( expression->leftOperand )->getRaw();
+        llvm::BasicBlock *leftParent = irBuilder.GetInsertBlock();
 
         if( expression->operation == BinaryOperation::LogicAnd )
             irBuilder.CreateCondBr( leftValue, evaluateRight, end );
@@ -369,6 +369,7 @@ struct CodeGenerator : ast::NodeVisitor {
         irBuilder.SetInsertPoint( evaluateRight );
         llvm::Value *rightValue =
             toBoolean( expression->rightOperand )->getRaw();
+        llvm::BasicBlock *rightParent = irBuilder.GetInsertBlock();
         irBuilder.CreateBr( end );
 
         irBuilder.SetInsertPoint( end );
@@ -379,11 +380,11 @@ struct CodeGenerator : ast::NodeVisitor {
             irBuilder.CreatePHI( irBuilder.getInt1Ty(), incomingBranchCount );
 
         if( expression->operation == BinaryOperation::LogicAnd )
-            resultValue->addIncoming( irBuilder.getFalse(), current );
+            resultValue->addIncoming( irBuilder.getFalse(), leftParent );
         else // operation == BinaryOperation::LogicOr
-            resultValue->addIncoming( irBuilder.getTrue(), current );
+            resultValue->addIncoming( irBuilder.getTrue(), leftParent );
 
-        resultValue->addIncoming( rightValue, evaluateRight );
+        resultValue->addIncoming( rightValue, rightParent );
 
         return _typeBuilder.getBooleanType()->createValue( resultValue );
     }
@@ -534,6 +535,11 @@ struct CodeGenerator : ast::NodeVisitor {
     }
 
     boost::any visit( ast::UnaryOperationExpression expression ) {
+
+        if( expression->operation == UnaryOperation::LogicInversion )
+            return _typeBuilder.getBooleanType()->createValue(
+                irBuilder.CreateNot(toBoolean(expression->operand)->getRaw()) );
+
         auto value = generate< Value >( expression->operand );
         Type type = value->getType();
 
@@ -553,9 +559,8 @@ struct CodeGenerator : ast::NodeVisitor {
                 _typeBuilder, _Type::Operator::ToBoolean, value );
             break;
         case UnaryOperation::PointerConversion:
-            result = _typeBuilder.getPointerType( type )->createValue(
+            return _typeBuilder.getPointerType( type )->createValue(
                 value->getRawPointer() );
-            break;
         default:
             throw NotImplementedError();
         }

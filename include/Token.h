@@ -22,6 +22,7 @@ enum class TokenType {
     KeywordFalse,
     KeywordFor,
     KeywordFunction,
+    KeywordNot,
     KeywordOr,
     KeywordPointer,
     KeywordPointerTo,

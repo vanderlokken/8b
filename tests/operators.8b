@@ -1,8 +1,6 @@
 class Test {
     function check( value boolean ) {
-        if( value ) {
-            # Do nothing
-        } else {
+        if( not value ) {
             instance.errorCount++;
         }
     }
@@ -81,10 +79,20 @@ class Test {
         instance.check( value.target == 4 );
     }
 
+    function checkBooleanOperators() {
+        instance.check( false or true );
+        instance.check( true and true );
+        instance.check( not false );
+
+        # Complicated test
+        instance.check( not(true and false) and (not true or not false) );
+    }
+
     function run() {
         instance.checkIntegerOperators();
         instance.checkRealOperators();
         instance.checkPointerOperators();
+        instance.checkBooleanOperators();
     }
 
     variable errorCount integer;

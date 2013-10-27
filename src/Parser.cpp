@@ -206,6 +206,9 @@ struct Parser : public NodeVisitor {
 
     // ------------------------------------------------------------------------
     //  Expressions
+    //
+    //  Note: expressions are parsed using the "top down operator precedence"
+    //        principle. See http://en.wikipedia.org/wiki/Pratt_parser
     // ------------------------------------------------------------------------
 
     int getLeftBindingPower() const {
@@ -233,6 +236,7 @@ struct Parser : public NodeVisitor {
             return 8;
         case TokenType::OperatorIncrement:
         case TokenType::OperatorDecrement:
+        case TokenType::KeywordNot:
             return 9;
         case TokenType::PunctuatorOpeningParenthesis:
         case TokenType::PunctuatorDot:
@@ -312,6 +316,18 @@ struct Parser : public NodeVisitor {
 
             return expression;
 
+        }
+
+        case TokenType::KeywordNot:
+        {
+            const int bindingPower = getLeftBindingPower();
+
+            auto expression = std::make_shared<_UnaryOperationExpression>();
+            expression->sourceLocation = extractToken().sourceLocation;
+            expression->operation = UnaryOperation::LogicInversion;
+            expression->operand = parseExpression( bindingPower );
+
+            return expression;
         }
 
         }
